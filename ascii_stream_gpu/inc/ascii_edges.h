@@ -5,7 +5,11 @@
  * Order: "/-|\\"
  */
 
+#ifdef __CUDACC__   // when compiling with nvcc
+__device__ __constant__ unsigned char ascii_edges[16][8] = {
+#else                // fallback for non-CUDA compilation (if ever needed)
 static const char ascii_edges[4][8] = {
+#endif
     /* '/' (0x2F) */
     { 0x60, 0x30, 0x18, 0x0C, 0x06, 0x03, 0x01, 0x00 },
     /* '-' (0x2D) */
@@ -17,4 +21,4 @@ static const char ascii_edges[4][8] = {
 };
 
 /* Parallel array with the characters in the same order. */
-static const char ascii_edges[5] = "/-|\\"
+static const char ascii_edges_chars[5] = "/-|\\";

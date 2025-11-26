@@ -7,6 +7,7 @@
 #include <math.h>
 
 #include "inc/ascii_scale.h"
+#include "inc/ascii_edges.h" 
 
 #define BLOCK_SIZE 8
 #define TILE_PIXELS (BLOCK_SIZE * BLOCK_SIZE)
@@ -81,9 +82,7 @@ __global__ void edgesKernel(unsigned char* img_dev_in,
     __shared__ float s_Gy[TILE_PIXELS];
 
     // Shared color for the whole tile (0..1)
-    __shared__ float s_r;
-    __shared__ float s_g;
-    __shared__ float s_b;
+    __shared__ int s_glyphIdx;
 
     bool inside = (x < width && y < height);
 
@@ -100,15 +99,15 @@ __global__ void edgesKernel(unsigned char* img_dev_in,
     if (interior) {
         // 3x3 luminance neighborhood around (x, y)
         float L00 = readPixelLuma(img_dev_in, width, channels, x - 1, y - 1);
-        float L10 = readPixelLuma(img_dev_in, width, channels, x, y - 1);
+        float L10 = readPixelLuma(img_dev_in, width, channels, x    , y - 1);
         float L20 = readPixelLuma(img_dev_in, width, channels, x + 1, y - 1);
 
         float L01 = readPixelLuma(img_dev_in, width, channels, x - 1, y);
-        float L11 = readPixelLuma(img_dev_in, width, channels, x, y);
+        float L11 = readPixelLuma(img_dev_in, width, channels, x    , y);
         float L21 = readPixelLuma(img_dev_in, width, channels, x + 1, y);
 
         float L02 = readPixelLuma(img_dev_in, width, channels, x - 1, y + 1);
-        float L12 = readPixelLuma(img_dev_in, width, channels, x, y + 1);
+        float L12 = readPixelLuma(img_dev_in, width, channels, x    , y + 1);
         float L22 = readPixelLuma(img_dev_in, width, channels, x + 1, y + 1);
 
         // Sobel X:
@@ -159,28 +158,24 @@ __global__ void edgesKernel(unsigned char* img_dev_in,
         float sumGx = s_Gx[0];                    // sum of Gx over tile
         float sumGy = s_Gy[0];                    // sum of Gy over tile
 
-        // --- Edge decision parameters ---
-        const float EDGE_THRESHOLD = 50.0f;      // magnitude threshold (tune)
-        const float COH_THRESHOLD = 0.6f;        // direction coherence threshold (0..1, tune)
+        // --- Edge decision parameters --- best: [50, 0.6] and [30, 65]
+        const float EDGE_THRESHOLD = 100.0f;      // magnitude threshold
+        const float COH_THRESHOLD = 0.65f;        // direction coherence threshold (0..1)
         const float EPS = 1e-6f;
 
         // Direction coherence:
         // C = |sum(grad)| / sum(|grad|)
         float vecLen = sqrtf(sumGx * sumGx + sumGy * sumGy);
-        float coherence = (sumMag > 0.0f) ? (vecLen / (sumMag + EPS)) : 0.0f;
+        // float coherence = (sumMag > 0.0f) ? (vecLen / (sumMag + EPS)) : 0.0f; // div /0 prot
+        float coherence = vecLen / (sumMag + EPS);
 
         bool hasEdge = (meanMag >= EDGE_THRESHOLD) &&
             (coherence >= COH_THRESHOLD);
 
-        float baseR, baseG, baseB;
+        // Default: no edge in this tile
+        int glyphIdx = -1;
 
-        if (!hasEdge) {
-            // No strong, coherent edge: dark grey tile
-            baseR = 0.2f;
-            baseG = 0.2f;
-            baseB = 0.2f;
-        }
-        else {
+        if (hasEdge) {
             // Compute dominant edge orientation from summed gradient
             const float PI = 3.1415926535f;
 
@@ -206,29 +201,30 @@ __global__ void edgesKernel(unsigned char* img_dev_in,
             int sector = (int)floorf(t + 0.5f);   // round to nearest 0..4
             if (sector == 4) sector = 0;         // wrap back to horizontal
 
+            // ascii_edges order in ascii_edges.h: "/ - | \"
+            // sector 0: horizontal  -> '-'
+            // sector 1: "/"         -> '/'
+            // sector 2: vertical    -> '|'
+            // sector 3: "\"         -> '\'
             switch (sector) {
             case 0: // horizontal
-                baseR = 1.0f; baseG = 0.0f; baseB = 0.0f;   // red
+                glyphIdx = 1; // '-'
                 break;
             case 1: // "/"
-                baseR = 1.0f; baseG = 1.0f; baseB = 0.0f;   // yellow
+                glyphIdx = 3; // '/'
                 break;
             case 2: // vertical
-                baseR = 0.0f; baseG = 1.0f; baseB = 0.0f;   // green
+                glyphIdx = 2; // '|'
                 break;
             case 3: // "\"
             default:
-                baseR = 0.0f; baseG = 0.0f; baseB = 1.0f;   // blue
+                glyphIdx = 0; // '\'
                 break;
             }
         }
 
-        // Tile brightness: full for edge tiles, dimmer for background
-        float bright = hasEdge ? 1.0f : 0.5f;
-
-        s_r = baseR * bright;
-        s_g = baseG * bright;
-        s_b = baseB * bright;
+        // Broadcast glyph index to all threads in the block
+        s_glyphIdx = glyphIdx;
     }
 
     __syncthreads();
@@ -239,13 +235,26 @@ __global__ void edgesKernel(unsigned char* img_dev_in,
 
     int outIdx = (y * width + x) * channels;
 
-    unsigned char R = (unsigned char)fminf(s_r * 255.0f, 255.0f);
-    unsigned char G = (unsigned char)fminf(s_g * 255.0f, 255.0f);
-    unsigned char B = (unsigned char)fminf(s_b * 255.0f, 255.0f);
+    // Background = white
+    unsigned char base = 0;
 
-    img_dev_out[outIdx + 0] = R;
-    img_dev_out[outIdx + 1] = G;
-    img_dev_out[outIdx + 2] = B;
+    // If this tile has an edge glyph, draw it
+    if (s_glyphIdx >= 0) {
+        // ty = row inside 8x8 glyph, tx = column
+        unsigned char rowBits =
+            (unsigned char)ascii_edges[s_glyphIdx][ty];
+
+        // Bit-per-pixel: LSB is leftmost column
+        int bit = (rowBits >> tx) & 0x01;
+
+        // 1 = ink (black), 0 = background (white)
+        base = bit ? 255 : 0;
+    }
+
+    // Monochrome output (RGB)
+    img_dev_out[outIdx + 0] = base;
+    img_dev_out[outIdx + 1] = base;
+    img_dev_out[outIdx + 2] = base;
 
     if (channels == 4) {
         img_dev_out[outIdx + 3] = 255;
