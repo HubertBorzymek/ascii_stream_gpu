@@ -1,0 +1,61 @@
+############################
+# Visual Studio build files
+############################
+# Build results
+bin/
+Bin/
+BIN/
+obj/
+Obj/
+Debug*/
+Release*/
+x64/
+x86/
+build/
+out/
+
+# VS user-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# VS cache/temp
+.vs/
+*.VC.db
+*.VC.VC.opendb
+
+############################
+# CUDA / NVCC artifacts
+############################
+*.cu.deps
+*.i
+*.ii
+*.cubin
+*.fatbin
+*.ptx
+*.cudafe1.cpp
+*.cudafe1.c
+*.cudafe1.gpu
+*.cudafe1.stub.c
+*.cudafe2.cpp
+*.cpp1.ii
+*.gpu
+
+############################
+# General
+############################
+*.log
+*.tmp
+*.cache
+*.old
+
+# Python junk (just in case)
+__pycache__/
+*.pyc
+
+############################
+# OS-generated files
+############################
+.DS_Store
+Thumbs.db
