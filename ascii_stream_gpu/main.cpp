@@ -158,7 +158,7 @@ int main() {
     }
 
     // 5. Run GPU ASCII filter
-    runEdgesKernel(dev.in, dev.out, img.width, img.height, img.channels);
+    runAsciiKernel(dev.in, dev.out, img.width, img.height, img.channels);
 
     // 6. Synchronize and copy result back to host
     checkCudaErrors(cudaDeviceSynchronize());

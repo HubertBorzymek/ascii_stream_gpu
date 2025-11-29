@@ -92,9 +92,9 @@ __global__ void edgesKernel(unsigned char* img_dev_in,
     float mag = 0.0f;
 
     // Only interior pixels have a full 3x3 neighborhood
-    bool interior = inside &&
-        (x > 0) && (x < width - 1) &&
-        (y > 0) && (y < height - 1);
+    bool interior = (x > 0) && (x < width - 1) &&
+                    (y > 0) && (y < height - 1);
+
 
     if (interior) {
         // 3x3 luminance neighborhood around (x, y)
@@ -166,7 +166,6 @@ __global__ void edgesKernel(unsigned char* img_dev_in,
         // Direction coherence:
         // C = |sum(grad)| / sum(|grad|)
         float vecLen = sqrtf(sumGx * sumGx + sumGy * sumGy);
-        // float coherence = (sumMag > 0.0f) ? (vecLen / (sumMag + EPS)) : 0.0f; // div /0 prot
         float coherence = vecLen / (sumMag + EPS);
 
         bool hasEdge = (meanMag >= EDGE_THRESHOLD) &&
@@ -187,7 +186,6 @@ __global__ void edgesKernel(unsigned char* img_dev_in,
 
             // Normalize to [0, 2pi)
             if (theta < 0.0f)       theta += 2.0f * PI;
-            if (theta >= 2.0f * PI) theta -= 2.0f * PI;
 
             // Edge orientation is modulo pi (line has no arrow)
             if (theta >= PI) theta -= PI;         // now in [0, pi)
