@@ -12,7 +12,7 @@
 #define BLOCK_SIZE   8
 #define TILE_PIXELS  (BLOCK_SIZE * BLOCK_SIZE)
 
-#define EDGE_THRESHOLD  50.0f
+#define EDGE_THRESHOLD  0.30f   // 0..1 of 255
 #define COH_THRESHOLD   0.6f
 #define EPS             1e-6f
 #define PI              3.1415926535f
@@ -30,6 +30,8 @@ __device__ float readPixelLuma(const unsigned char* img_dev_in, int width, int c
 __device__ float calcPixelLuma(unsigned char r, unsigned char g, unsigned char b);
 __device__ int pickBrightnessGlyph(float sumLuma);
 __device__ int pickEdgeGlyph(float sumMag, float sumGx, float sumGy);
+__device__ void shadePixelMonochrome(unsigned char* img_dev_out, int outIdx, int channels, unsigned char base);
+
 
 
 
@@ -203,13 +205,8 @@ __global__ void asciiKernel(
     int bit = (rowBits >> tx) & 0x01;
     base = bit ? 255 : 0; // white symbol on black
 
-    img_dev_out[outIdx + 0] = base;
-    img_dev_out[outIdx + 1] = base;
-    img_dev_out[outIdx + 2] = base;
-
-    if (channels == 4) {
-        img_dev_out[outIdx + 3] = 255;
-    }
+    // Monochrome tinting
+    shadePixelMonochrome(img_dev_out, outIdx, channels, base);
 }
 
 
@@ -249,7 +246,7 @@ __device__ int pickEdgeGlyph(float sumMag, float sumGx, float sumGy) {
     float vecLen = sqrtf(sumGx * sumGx + sumGy * sumGy);
     float coherence = vecLen / (sumMag + EPS);
 
-    bool hasEdge =  (meanMag >= EDGE_THRESHOLD) &&
+    bool hasEdge =  (meanMag >= (255.0f * EDGE_THRESHOLD)) &&
                     (coherence >= COH_THRESHOLD);
 
     if (!hasEdge) {
@@ -295,4 +292,32 @@ __device__ int pickEdgeGlyph(float sumMag, float sumGx, float sumGy) {
 
     return edgeGlyph;
 }
+
+// Monochrome shading helper: applies a colored ASCII pixel
+__device__ void shadePixelMonochrome(unsigned char* img_dev_out,
+    int outIdx,
+    int channels,
+    unsigned char base)
+{
+    // Monochrome tint (0.0f..1.0f)
+    // Example: red   = (1, 0, 0)
+    //          green = (0, 1, 0)
+    //          blue  = (0, 0, 1)
+    //          yellow = (1, 1, 0)
+    //          nice blue = (0.7, 0.9, 0.9)
+    //          nice orange = (0.9, 0.5, 0.2)
+    //          nice yellow = (0.9, 0.7, 0.2)
+    const float r = 0.7f;
+    const float g = 0.9f;
+    const float b = 0.9f;
+
+    img_dev_out[outIdx + 0] = static_cast<unsigned char>(base * r);
+    img_dev_out[outIdx + 1] = static_cast<unsigned char>(base * g);
+    img_dev_out[outIdx + 2] = static_cast<unsigned char>(base * b);
+
+    if (channels == 4) {
+        img_dev_out[outIdx + 3] = 255;
+    }
+}
+
 
