@@ -1,4 +1,4 @@
-#include "d3d_renderer.h"
+#include "D3dRenderer.h"
 
 #include <stdexcept>
 #include <cstring>
@@ -69,27 +69,39 @@ void D3DRenderer::CreateRTV()
         "CreateRenderTargetView failed");
 }
 
-void D3DRenderer::ResizeIfNeeded()
+void D3DRenderer::OnResize(int newW, int newH)
 {
-    if (!m_swap) return;
+    if (!m_swap || !m_device || !m_ctx)
+        return;
 
-    DXGI_SWAP_CHAIN_DESC1 scDesc{};
-    ThrowIfFailed(m_swap->GetDesc1(&scDesc), "GetDesc1 failed");
+    // Minimized (or invalid) - do not resize swapchain to 0x0.
+    if (newW <= 0 || newH <= 0)
+        return;
 
-    if ((int)scDesc.Width != m_winW || (int)scDesc.Height != m_winH)
-    {
-        if (m_winW <= 0 || m_winH <= 0)
-            return; // minimized or invalid
+    // No change
+    if (newW == m_winW && newH == m_winH)
+        return;
 
-        m_ctx->OMSetRenderTargets(0, nullptr, nullptr);
-        m_rtv.Reset();
+    m_winW = newW;
+    m_winH = newH;
 
-        ThrowIfFailed(m_swap->ResizeBuffers(0, m_winW, m_winH, scDesc.Format, scDesc.Flags),
-            "ResizeBuffers failed");
+    // Release references to the backbuffer before resizing.
+    m_ctx->OMSetRenderTargets(0, nullptr, nullptr);
+    m_rtv.Reset();
 
-        CreateRTV();
-    }
+    // Resize swapchain buffers to match the new window client size.
+    // Use DXGI_FORMAT_UNKNOWN to keep the existing format.
+    ThrowIfFailed(m_swap->ResizeBuffers(
+        0,
+        static_cast<UINT>(m_winW),
+        static_cast<UINT>(m_winH),
+        DXGI_FORMAT_UNKNOWN,
+        0),
+        "ResizeBuffers failed");
+
+    CreateRTV();
 }
+
 
 void D3DRenderer::CreateFullscreenPipeline()
 {
@@ -199,16 +211,6 @@ void D3DRenderer::EnsureStableTextureMatches(ID3D11Texture2D* captured)
 
 void D3DRenderer::RenderFrame(ID3D11Texture2D* capturedTex)
 {
-    // Update window size from swapchain target window.
-    // In this simple version, we just query current swapchain desc.
-    // (Later we can pass size from window module if needed.)
-    DXGI_SWAP_CHAIN_DESC1 scDesc{};
-    ThrowIfFailed(m_swap->GetDesc1(&scDesc), "GetDesc1 failed");
-    m_winW = (int)scDesc.Width;
-    m_winH = (int)scDesc.Height;
-
-    ResizeIfNeeded();
-
     // Copy captured frame into stable SRV texture (GPU->GPU).
     if (capturedTex)
     {

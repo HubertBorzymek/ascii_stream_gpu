@@ -2,8 +2,11 @@
 #include <atomic>
 
 static std::atomic<bool> s_running{ true };
-static int s_winW = 1280;
-static int s_winH = 720;
+static int s_winW;
+static int s_winH;
+
+static ResizeCallback s_onResize = nullptr;
+
 
 // Main window procedure (message handler).
 LRESULT CALLBACK AppWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -13,6 +16,11 @@ LRESULT CALLBACK AppWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_SIZE:
         s_winW = LOWORD(lParam);
         s_winH = HIWORD(lParam);
+
+        // Notify listener (if any).
+        if (s_onResize)
+            s_onResize(s_winW, s_winH);
+
         return 0;
 
     case WM_DESTROY:
@@ -49,7 +57,16 @@ HWND CreateAppWindow(HINSTANCE hInst, int width, int height)
     );
 
     ShowWindow(hwnd, SW_SHOW);
+
+    s_winW = width;
+    s_winH = height;
     return hwnd;
+}
+
+// Setters
+void SetResizeCallback(ResizeCallback cb)
+{
+    s_onResize = cb;
 }
 
 // Getters

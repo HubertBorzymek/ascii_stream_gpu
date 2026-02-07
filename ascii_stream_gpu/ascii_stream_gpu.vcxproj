@@ -11,12 +11,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="ascii_kernel.cu" />
-    <CudaCompile Include="chars_kernel.cu">
+    <CudaCompile Include="src\processing\effects\ASCII\chars_kernel.cu">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </CudaCompile>
-    <CudaCompile Include="edges_kernel.cu">
+    <CudaCompile Include="src\processing\effects\ASCII\edges_kernel.cu">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </CudaCompile>
@@ -26,20 +25,22 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="src\app\main.cpp" />
-    <ClCompile Include="src\app\window.cpp" />
-    <ClCompile Include="src\capture\screen_capture.cpp" />
-    <ClCompile Include="src\dx\dx_context.cpp" />
-    <ClCompile Include="src\render\d3d_renderer.cpp" />
+    <ClCompile Include="src\app\Main.cpp" />
+    <ClCompile Include="src\app\Window.cpp" />
+    <ClCompile Include="src\capture\ScreenCapture.cpp" />
+    <ClCompile Include="src\dx\DxContext.cpp" />
+    <ClCompile Include="src\processing\core\FrameProcessor.cpp" />
+    <ClCompile Include="src\render\D3dRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="inc\ascii_edges.h" />
-    <ClInclude Include="inc\ascii_kernel.h" />
-    <ClInclude Include="inc\ascii_scale.h" />
-    <ClInclude Include="src\app\window.h" />
-    <ClInclude Include="src\capture\screen_capture.h" />
-    <ClInclude Include="src\dx\dx_context.h" />
-    <ClInclude Include="src\render\d3d_renderer.h" />
+    <ClInclude Include="src\processing\core\FrameProcessor.h" />
+    <ClInclude Include="src\processing\res\ascii_edges.h" />
+    <ClInclude Include="src\processing\res\ascii_kernel.h" />
+    <ClInclude Include="src\processing\res\ascii_scale.h" />
+    <ClInclude Include="src\app\Window.h" />
+    <ClInclude Include="src\capture\ScreenCapture.h" />
+    <ClInclude Include="src\dx\DxContext.h" />
+    <ClInclude Include="src\render\D3dRenderer.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9BA688B4-A49B-19A6-F431-EE7F07EA6C7E}</ProjectGuid>

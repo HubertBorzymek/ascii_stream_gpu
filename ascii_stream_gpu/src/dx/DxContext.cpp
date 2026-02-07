@@ -1,6 +1,6 @@
 // src/dx/dx_context.cpp
 
-#include "dx_context.h"
+#include "DxContext.h"
 
 #include <stdexcept>
 #include <iostream>

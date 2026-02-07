@@ -23,13 +23,15 @@ public:
     // Initializes swapchain/RTV for the given window and builds fullscreen pipeline.
     void Initialize(HWND hwnd, ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> ctx);
 
+    // Called when the window client size changes (WM_SIZE or polled in main).
+    void OnResize(int newW, int newH);
+
     // Renders one frame. capturedTex can be null (then it just clears).
     void RenderFrame(ID3D11Texture2D* capturedTex);
 
 private:
     void CreateSwapchainAndRTV(HWND hwnd);
     void CreateRTV();
-    void ResizeIfNeeded();
     void CreateFullscreenPipeline();
     void EnsureStableTextureMatches(ID3D11Texture2D* captured);
 
@@ -53,6 +55,6 @@ private:
 
     DXGI_FORMAT m_backbufferFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 
-    int m_winW = 1280;
-    int m_winH = 720;
+    int m_winW;
+    int m_winH;
 };

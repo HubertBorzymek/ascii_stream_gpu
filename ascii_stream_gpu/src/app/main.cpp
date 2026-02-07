@@ -1,10 +1,11 @@
 // ascii_stream_gpu_preview.cpp
 // Minimal Win32 + D3D11 window that displays Windows Graphics Capture frames (GPU-only path).
 
-#include "window.h"
-#include "../capture/screen_capture.h"
-#include "../render/d3d_renderer.h"
-#include "../dx/dx_context.h"
+#include "Window.h"
+#include "../capture/ScreenCapture.h"
+#include "../render/D3dRenderer.h"
+#include "../dx/DxContext.h"
+#include "../processing/core/FrameProcessor.h"
 
 #include <Windows.h>
 #include <iostream>
@@ -20,6 +21,15 @@
 
 # define WIN_W 1280
 # define WIN_H 720
+
+static D3DRenderer* g_renderer = nullptr;
+
+// Trampoline
+static void OnAppResize(int w, int h)
+{
+    if (g_renderer)
+        g_renderer->OnResize(w, h);
+}
 
 // --------------------------------------------------------
 // wWinMain
@@ -45,10 +55,16 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int)
         // Create render system (swapchain + shader pipeline).
         D3DRenderer renderer;
         renderer.Initialize(hwnd, dx.device, dx.context);
+        g_renderer = &renderer;
+        SetResizeCallback(&OnAppResize);
 
-        // Setup capture (WGC).
+        // Create screen capure (WGC).
         ScreenCapture capture;
         capture.Start(dx.device);
+
+        // Create frame processor
+        FrameProcessor frameProcessor;
+        frameProcessor.Initialize(dx.device, dx.context);
 
         // Main message + render loop.
         MSG msg{};
@@ -61,10 +77,12 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int)
             }
 
             auto tex = capture.LatestTexture();
+            ID3D11Texture2D* processed = frameProcessor.Process(tex.Get());
             renderer.RenderFrame(tex.Get());
 
         }
 
+        frameProcessor.Shutdown();
         capture.Stop();
         return 0;
     }

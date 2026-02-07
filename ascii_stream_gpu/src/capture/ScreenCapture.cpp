@@ -1,4 +1,4 @@
-#include "screen_capture.h"
+#include "ScreenCapture.h"
 
 #include <stdexcept>
 #include <iostream>
