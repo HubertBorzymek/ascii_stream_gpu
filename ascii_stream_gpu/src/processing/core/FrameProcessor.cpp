@@ -2,44 +2,66 @@
 
 #include <stdexcept>
 
-void FrameProcessor::Initialize(ComPtr<ID3D11Device> device,
-    ComPtr<ID3D11DeviceContext> context)
+#include "../effects/ASCII/AsciiEffect.h"
+
+void FrameProcessor::Initialize(ComPtr<ID3D11Device> deviceIn,
+    ComPtr<ID3D11DeviceContext> contextIn)
 {
-    if (!device)
+    if (!deviceIn)
         throw std::runtime_error("FrameProcessor::Initialize: device is null");
-    if (!context)
+    if (!contextIn)
         throw std::runtime_error("FrameProcessor::Initialize: context is null");
 
-    m_device = device;
-    m_context = context;
-    m_initialized = true;
+    device = deviceIn;
+    context = contextIn;
+
+    // Create default effect: ASCII.
+    effect = std::make_unique<AsciiEffect>();
+    effect->Initialize(device, context);
+
+    initialized = true;
 }
 
 void FrameProcessor::Shutdown()
 {
-    // Release references to D3D objects.
-    m_context.Reset();
-    m_device.Reset();
+    if (effect)
+    {
+        effect->Shutdown();
+        effect.reset();
+    }
 
-    m_initialized = false;
+    context.Reset();
+    device.Reset();
+
+    initialized = false;
 }
 
-void FrameProcessor::SetEnabled(bool enabled)
+void FrameProcessor::SetEnabled(bool enabledIn)
 {
-    m_enabled = enabled;
+    enabled = enabledIn;
+}
+
+void FrameProcessor::SetEffectEnabled(bool enabledIn)
+{
+    if (effect)
+        effect->SetEnabled(enabledIn);
+}
+
+bool FrameProcessor::IsEffectEnabled() const
+{
+    return effect ? effect->IsEnabled() : false;
 }
 
 ID3D11Texture2D* FrameProcessor::Process(ID3D11Texture2D* inputTex)
 {
-    // No processing if not initialized or disabled.
-    if (!m_initialized || !m_enabled)
+    if (!initialized || !enabled)
         return inputTex;
 
-    // No input -> no output.
     if (!inputTex)
         return nullptr;
 
-    // Passthrough for now.
-    // Later this is where effects (e.g. ASCII) will run.
-    return inputTex;
+    if (!effect)
+        return inputTex;
+
+    return effect->Process(inputTex);
 }
