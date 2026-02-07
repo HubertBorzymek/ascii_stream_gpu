@@ -1,0 +1,78 @@
+// ascii_stream_gpu_preview.cpp
+// Minimal Win32 + D3D11 window that displays Windows Graphics Capture frames (GPU-only path).
+
+#include "window.h"
+#include "../capture/screen_capture.h"
+#include "../render/d3d_renderer.h"
+#include "../dx/dx_context.h"
+
+#include <Windows.h>
+#include <iostream>
+#include <string>
+#include <cstring>
+#include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Graphics.Capture.h>
+
+#pragma comment(lib, "windowsapp.lib")
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "d3dcompiler.lib")
+
+# define WIN_W 1280
+# define WIN_H 720
+
+// --------------------------------------------------------
+// wWinMain
+// Program entry: creates window, D3D, capture session, and runs the render loop.
+// --------------------------------------------------------
+int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int)
+{
+    try
+    {
+        winrt::init_apartment();
+
+        if (!winrt::Windows::Graphics::Capture::GraphicsCaptureSession::IsSupported())
+        {
+            MessageBox(nullptr, L"Windows Graphics Capture is not supported.", L"Error", MB_OK);
+            return 0;
+        }
+
+        HWND hwnd = CreateAppWindow(hInst, WIN_W, WIN_H);
+
+        // Create D3D device/context (GPU).
+        DxContext dx = CreateDxContext();
+
+        // Create render system (swapchain + shader pipeline).
+        D3DRenderer renderer;
+        renderer.Initialize(hwnd, dx.device, dx.context);
+
+        // Setup capture (WGC).
+        ScreenCapture capture;
+        capture.Start(dx.device);
+
+        // Main message + render loop.
+        MSG msg{};
+        while (AppIsRunning())
+        {
+            while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+            {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
+
+            auto tex = capture.LatestTexture();
+            renderer.RenderFrame(tex.Get());
+
+        }
+
+        capture.Stop();
+        return 0;
+    }
+    catch (const std::exception& e)
+    {
+        std::wstring wmsg = L"Fatal error: ";
+        wmsg += std::wstring(e.what(), e.what() + strlen(e.what()));
+        MessageBox(nullptr, wmsg.c_str(), L"Exception", MB_OK | MB_ICONERROR);
+        return 0;
+    }
+}
