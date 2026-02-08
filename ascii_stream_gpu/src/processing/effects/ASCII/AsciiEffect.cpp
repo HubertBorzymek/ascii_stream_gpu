@@ -6,16 +6,12 @@
 #include <cuda_runtime.h>
 #include <cuda_d3d11_interop.h>
 
-extern "C" void RunDebugPassthrough(cudaArray_t srcArray, cudaArray_t dstArray, int width, int height);
+#include "../../cuda/CudaUtils.h"
+
+extern "C" void RunAsciiKernel(cudaArray_t srcArray, cudaArray_t dstArray, int width, int height);
 
 namespace
 {
-    inline void ThrowIfCuda(cudaError_t err, const char* msg)
-    {
-        if (err != cudaSuccess)
-            throw std::runtime_error(std::string(msg) + ": " + cudaGetErrorString(err));
-    }
-
     struct CudaGraphicsMapGuard
     {
         cudaGraphicsResource** resources = nullptr;
@@ -220,7 +216,7 @@ ID3D11Texture2D* AsciiEffect::ProcessImpl(ID3D11Texture2D* inputTex)
         ThrowIfCuda(cudaGraphicsSubResourceGetMappedArray(&outArray, m_cudaOutputRes, 0, 0),
             "cudaGraphicsSubResourceGetMappedArray(output) failed");
 
-        RunDebugPassthrough(inArray, outArray, (int)m_outputDesc.Width, (int)m_outputDesc.Height);
+        RunAsciiKernel(inArray, outArray, (int)m_outputDesc.Width, (int)m_outputDesc.Height);
 
         // Kernel launch error (asynchronous)
         ThrowIfCuda(cudaGetLastError(), "DebugPassthroughKernel launch failed");

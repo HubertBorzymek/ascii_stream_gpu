@@ -16,7 +16,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </CudaCompile>
-    <CudaCompile Include="src\processing\effects\ASCII\DebugKernel.cu" />
     <CudaCompile Include="src\processing\effects\ASCII\edges_kernel.cu">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -38,12 +37,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\processing\core\FrameProcessor.h" />
+    <ClInclude Include="src\processing\cuda\CudaUtils.h" />
     <ClInclude Include="src\processing\effects\ASCII\AsciiEffect.h" />
     <ClInclude Include="src\processing\effects\EffectBase.h" />
     <ClInclude Include="src\processing\effects\IEffect.h" />
-    <ClInclude Include="src\processing\res\ascii_edges.h" />
-    <ClInclude Include="src\processing\res\ascii_kernel.h" />
-    <ClInclude Include="src\processing\res\ascii_scale.h" />
+    <ClInclude Include="src\processing\res\AsciiEdges.h" />
+    <ClInclude Include="src\processing\res\AsciiScale.h" />
     <ClInclude Include="src\app\Window.h" />
     <ClInclude Include="src\capture\ScreenCapture.h" />
     <ClInclude Include="src\dx\DxContext.h" />
