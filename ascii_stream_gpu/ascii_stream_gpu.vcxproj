@@ -11,10 +11,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="src\processing\effects\ASCII\AsciiKernel.cu" />
     <CudaCompile Include="src\processing\effects\ASCII\chars_kernel.cu">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </CudaCompile>
+    <CudaCompile Include="src\processing\effects\ASCII\DebugKernel.cu" />
     <CudaCompile Include="src\processing\effects\ASCII\edges_kernel.cu">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -31,11 +33,13 @@
     <ClCompile Include="src\dx\DxContext.cpp" />
     <ClCompile Include="src\processing\core\FrameProcessor.cpp" />
     <ClCompile Include="src\processing\effects\ASCII\AsciiEffect.cpp" />
+    <ClCompile Include="src\processing\effects\EffectBase.cpp" />
     <ClCompile Include="src\render\D3dRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\processing\core\FrameProcessor.h" />
     <ClInclude Include="src\processing\effects\ASCII\AsciiEffect.h" />
+    <ClInclude Include="src\processing\effects\EffectBase.h" />
     <ClInclude Include="src\processing\effects\IEffect.h" />
     <ClInclude Include="src\processing\res\ascii_edges.h" />
     <ClInclude Include="src\processing\res\ascii_kernel.h" />

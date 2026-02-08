@@ -102,7 +102,6 @@ void D3DRenderer::OnResize(int newW, int newH)
     CreateRTV();
 }
 
-
 void D3DRenderer::CreateFullscreenPipeline()
 {
     struct Vtx { float x, y, u, v; };

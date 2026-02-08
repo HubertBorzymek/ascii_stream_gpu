@@ -14,7 +14,7 @@ public:
 
     // Called once after D3D device/context creation.
     virtual void Initialize(ComPtr<ID3D11Device> device,
-        ComPtr<ID3D11DeviceContext> context) = 0;
+                            ComPtr<ID3D11DeviceContext> context) = 0;
 
     // Called on shutdown to release internal resources.
     virtual void Shutdown() = 0;

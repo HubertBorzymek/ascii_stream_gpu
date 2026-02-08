@@ -1,15 +1,19 @@
 #pragma once
 
-#include "../IEffect.h"
+#include "../EffectBase.h"
 
+#include <d3d11.h>
 #include <wrl.h>
 
 using Microsoft::WRL::ComPtr;
 
+// Forward declaration to avoid including CUDA headers in .h
+struct cudaGraphicsResource;
+
 // AsciiEffect
 // GPU effect that will apply ASCII stylization to the input frame.
-// For now it creates an output texture and copies input -> output (passthrough via copy).
-class AsciiEffect final : public IEffect
+// Next step: D3D11 <-> CUDA interop (passthrough first), then ASCII kernel.
+class AsciiEffect final : public EffectBase
 {
 public:
     AsciiEffect() = default;
@@ -18,28 +22,33 @@ public:
     AsciiEffect(const AsciiEffect&) = delete;
     AsciiEffect& operator=(const AsciiEffect&) = delete;
 
-    void Initialize(ComPtr<ID3D11Device> device,
-        ComPtr<ID3D11DeviceContext> context) override;
+protected:
+    void OnShutdown() override;
 
-    void Shutdown() override;
-
-    void SetEnabled(bool enabled) override;
-    bool IsEnabled() const override;
-
-    ID3D11Texture2D* Process(ID3D11Texture2D* inputTex) override;
+    ID3D11Texture2D* ProcessImpl(ID3D11Texture2D* inputTex) override;
 
 private:
+    void EnsureInputMatches(ID3D11Texture2D* inputTex);
     void EnsureOutputMatches(ID3D11Texture2D* inputTex);
 
+    // CUDA interop helpers (implemented later in .cpp)
+    void ReleaseCudaResources();
+    void EnsureCudaRegistered(ID3D11Texture2D* inputTex);
+
 private:
-    ComPtr<ID3D11Device> m_device;
-    ComPtr<ID3D11DeviceContext> m_context;
+    // Internal input copy owned by this effect (interop-friendly).
+    ComPtr<ID3D11Texture2D> m_inputTex;
+    bool m_inputDescValid = false;
+    D3D11_TEXTURE2D_DESC m_inputDesc{};
 
     // Output owned by this effect (will be rendered by D3DRenderer).
     ComPtr<ID3D11Texture2D> m_outputTex;
     bool m_outputDescValid = false;
     D3D11_TEXTURE2D_DESC m_outputDesc{};
 
-    bool m_enabled = true;
-    bool m_initialized = false;
+    // CUDA interop state
+    cudaGraphicsResource* m_cudaInputRes = nullptr;
+    cudaGraphicsResource* m_cudaOutputRes = nullptr;
+
+    bool m_cudaReady = false;
 };

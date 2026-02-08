@@ -78,7 +78,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int)
 
             auto tex = capture.LatestTexture();
             ID3D11Texture2D* processed = frameProcessor.Process(tex.Get());
-            renderer.RenderFrame(tex.Get());
+            renderer.RenderFrame(processed);
 
         }
 
