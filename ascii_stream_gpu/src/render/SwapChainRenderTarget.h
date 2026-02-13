@@ -39,7 +39,7 @@ public:
     int Height() const { return m_winH; }
 
 private:
-    void CreateSwapchainAndRTV(HWND hwnd);
+    void CreateSwapchain(HWND hwnd);
     void CreateRTV();
 
 private:

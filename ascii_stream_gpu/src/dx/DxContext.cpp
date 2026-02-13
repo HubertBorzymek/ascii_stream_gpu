@@ -5,14 +5,7 @@
 #include <stdexcept>
 #include <iostream>
 
-static void ThrowIfFailed(HRESULT hr, const char* msg)
-{
-    if (FAILED(hr))
-    {
-        // Keep message short here; app layer can decide how to show it.
-        throw std::runtime_error(msg);
-    }
-}
+#include "../dx/DxUtils.h"
 
 DxContext CreateDxContext()
 {

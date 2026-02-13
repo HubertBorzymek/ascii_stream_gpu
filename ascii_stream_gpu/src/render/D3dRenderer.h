@@ -6,6 +6,8 @@
 #include <d3dcompiler.h>
 #include <wrl.h>
 
+#include "SwapChainRenderTarget.h"
+
 using Microsoft::WRL::ComPtr;
 
 // D3DRenderer
@@ -30,14 +32,15 @@ public:
     void RenderFrame(ID3D11Texture2D* capturedTex);
 
 private:
-    void CreateSwapchainAndRTV(HWND hwnd);
-    void CreateRTV();
     void CreateFullscreenPipeline();
     void EnsureStableTextureMatches(ID3D11Texture2D* captured);
 
 private:
     ComPtr<ID3D11Device> m_device;
     ComPtr<ID3D11DeviceContext> m_ctx;
+
+    // Swapchain + RTV encapsulated here.
+    SwapChainRenderTarget m_rt;
 
     ComPtr<IDXGISwapChain1> m_swap;
     ComPtr<ID3D11RenderTargetView> m_rtv;
@@ -52,9 +55,4 @@ private:
     // Stable SRV texture
     ComPtr<ID3D11Texture2D> m_stableTex;
     ComPtr<ID3D11ShaderResourceView> m_stableSRV;
-
-    DXGI_FORMAT m_backbufferFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
-
-    int m_winW;
-    int m_winH;
 };

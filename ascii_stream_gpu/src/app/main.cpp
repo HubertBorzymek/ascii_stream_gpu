@@ -6,6 +6,7 @@
 #include "Hotkeys.h"
 #include "../capture/ScreenCapture.h"
 #include "../render/D3dRenderer.h"
+#include "../render/SwapChainRenderTarget.h"
 #include "../dx/DxContext.h"
 #include "../processing/core/FrameProcessor.h"
 
@@ -26,13 +27,20 @@
 # define WIN_W 1280
 # define WIN_H 720
 
-static D3DRenderer* g_renderer = nullptr;
+static D3DRenderer* g_renderer = nullptr; 
+static SwapChainRenderTarget* g_panelRT = nullptr;
 
 // Trampoline
 static void OnAppResize(int w, int h)
 {
     if (g_renderer)
         g_renderer->OnResize(w, h);
+}
+
+static void OnPanelResize(int w, int h)
+{
+    if (g_panelRT)
+        g_panelRT->OnResize(w, h);
 }
 
 // --------------------------------------------------------
@@ -67,9 +75,12 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int)
         D3DRenderer renderer;
         renderer.Initialize(hwndMain, dx.device, dx.context);
         g_renderer = &renderer;
+        SetResizeCallback(hwndMain, &OnAppResize);  // Resize callback bound to MAIN window
 
-        // Resize callback bound to MAIN window
-        SetResizeCallback(hwndMain, &OnAppResize);
+        SwapChainRenderTarget panelRT;
+        panelRT.Initialize(hwndPanel, dx.device, dx.context);
+        g_panelRT = &panelRT;
+        SetResizeCallback(hwndPanel, &OnPanelResize);   // Resize callback bound to Panel window
 
         // Create screen capure (WGC).
         ScreenCapture capture;
@@ -100,6 +111,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int)
             ID3D11Texture2D* processed = frameProcessor.Process(tex.Get());
             renderer.RenderFrame(processed);
             //renderer.RenderFrame(tex.Get());
+
+            float clearPanel[4] = { 0.05f, 0.05f, 0.05f, 1.0f };
+            panelRT.Begin(clearPanel);
+            panelRT.Present(1);
 
             // FPS counter
             frameCount++;

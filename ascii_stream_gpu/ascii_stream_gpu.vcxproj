@@ -23,10 +23,12 @@
     <ClCompile Include="src\processing\effects\ASCII\AsciiEffect.cpp" />
     <ClCompile Include="src\processing\effects\EffectBase.cpp" />
     <ClCompile Include="src\render\D3dRenderer.cpp" />
+    <ClCompile Include="src\render\SwapChainRenderTarget.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\app\Hotkeys.h" />
     <ClInclude Include="src\app\WindowRole.h" />
+    <ClInclude Include="src\dx\DxUtils.h" />
     <ClInclude Include="src\processing\core\FrameProcessor.h" />
     <ClInclude Include="src\processing\cuda\CudaUtils.h" />
     <ClInclude Include="src\processing\effects\ASCII\AsciiEffect.h" />

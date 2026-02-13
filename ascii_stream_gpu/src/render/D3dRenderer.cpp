@@ -3,11 +3,7 @@
 #include <stdexcept>
 #include <cstring>
 
-static void ThrowIfFailed(HRESULT hr, const char* msg)
-{
-    if (FAILED(hr))
-        throw std::runtime_error(msg);
-}
+#include "../dx/DxUtils.h"
 
 void D3DRenderer::Initialize(HWND hwnd, ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> ctx)
 {
@@ -18,88 +14,16 @@ void D3DRenderer::Initialize(HWND hwnd, ComPtr<ID3D11Device> device, ComPtr<ID3D
     m_device = device;
     m_ctx = ctx;
 
-    // Initialize window size from the actual client rect (no globals).
-    RECT rc{};
-    GetClientRect(hwnd, &rc);
-    m_winW = (rc.right - rc.left);
-    m_winH = (rc.bottom - rc.top);
+    // Initialize swapchain + RTV through encapsulated render target.
+    m_rt.Initialize(hwnd, device, ctx);
 
-    CreateSwapchainAndRTV(hwnd);
+    // Build fullscreen pipeline (quad + shaders).
     CreateFullscreenPipeline();
-}
-
-void D3DRenderer::CreateSwapchainAndRTV(HWND hwnd)
-{
-    ComPtr<IDXGIDevice> dxgiDev;
-    ThrowIfFailed(m_device.As(&dxgiDev), "As IDXGIDevice failed");
-
-    ComPtr<IDXGIAdapter> adapter;
-    ThrowIfFailed(dxgiDev->GetAdapter(&adapter), "GetAdapter failed");
-
-    ComPtr<IDXGIFactory2> factory;
-    ThrowIfFailed(adapter->GetParent(__uuidof(IDXGIFactory2), (void**)factory.GetAddressOf()),
-        "GetParent IDXGIFactory2 failed");
-
-    DXGI_SWAP_CHAIN_DESC1 desc{};
-    desc.Width = m_winW;
-    desc.Height = m_winH;
-    desc.Format = m_backbufferFormat;
-    desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    desc.BufferCount = 2;
-    desc.SampleDesc.Count = 1;
-    desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    desc.Scaling = DXGI_SCALING_STRETCH;
-    desc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
-
-    ThrowIfFailed(factory->CreateSwapChainForHwnd(m_device.Get(), hwnd, &desc, nullptr, nullptr, &m_swap),
-        "CreateSwapChainForHwnd failed");
-
-    CreateRTV();
-}
-
-void D3DRenderer::CreateRTV()
-{
-    m_rtv.Reset();
-
-    ComPtr<ID3D11Texture2D> backbuf;
-    ThrowIfFailed(m_swap->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)backbuf.GetAddressOf()),
-        "GetBuffer backbuffer failed");
-
-    ThrowIfFailed(m_device->CreateRenderTargetView(backbuf.Get(), nullptr, &m_rtv),
-        "CreateRenderTargetView failed");
 }
 
 void D3DRenderer::OnResize(int newW, int newH)
 {
-    if (!m_swap || !m_device || !m_ctx)
-        return;
-
-    // Minimized (or invalid) - do not resize swapchain to 0x0.
-    if (newW <= 0 || newH <= 0)
-        return;
-
-    // No change
-    if (newW == m_winW && newH == m_winH)
-        return;
-
-    m_winW = newW;
-    m_winH = newH;
-
-    // Release references to the backbuffer before resizing.
-    m_ctx->OMSetRenderTargets(0, nullptr, nullptr);
-    m_rtv.Reset();
-
-    // Resize swapchain buffers to match the new window client size.
-    // Use DXGI_FORMAT_UNKNOWN to keep the existing format.
-    ThrowIfFailed(m_swap->ResizeBuffers(
-        0,
-        static_cast<UINT>(m_winW),
-        static_cast<UINT>(m_winH),
-        DXGI_FORMAT_UNKNOWN,
-        0),
-        "ResizeBuffers failed");
-
-    CreateRTV();
+    m_rt.OnResize(newW, newH);
 }
 
 void D3DRenderer::CreateFullscreenPipeline()
@@ -194,7 +118,7 @@ void D3DRenderer::EnsureStableTextureMatches(ID3D11Texture2D* captured)
         m_stableTex.Reset();
 
         D3D11_TEXTURE2D_DESC td = cdesc;
-        td.BindFlags = D3D11_BIND_SHADER_RESOURCE; // sampleable by pixel shader
+        td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
         td.Usage = D3D11_USAGE_DEFAULT;
         td.CPUAccessFlags = 0;
         td.MiscFlags = 0;
@@ -202,7 +126,9 @@ void D3DRenderer::EnsureStableTextureMatches(ID3D11Texture2D* captured)
         td.ArraySize = 1;
         td.SampleDesc.Count = 1;
 
-        ThrowIfFailed(m_device->CreateTexture2D(&td, nullptr, &m_stableTex), "CreateTexture2D stableTex failed");
+        ThrowIfFailed(m_device->CreateTexture2D(&td, nullptr, &m_stableTex),
+            "CreateTexture2D stableTex failed");
+
         ThrowIfFailed(m_device->CreateShaderResourceView(m_stableTex.Get(), nullptr, &m_stableSRV),
             "CreateShaderResourceView stableSRV failed");
     }
@@ -218,15 +144,7 @@ void D3DRenderer::RenderFrame(ID3D11Texture2D* capturedTex)
     }
 
     float clear[4] = { 0.f, 0.f, 0.f, 1.f };
-    m_ctx->OMSetRenderTargets(1, m_rtv.GetAddressOf(), nullptr);
-    m_ctx->ClearRenderTargetView(m_rtv.Get(), clear);
-
-    D3D11_VIEWPORT vp{};
-    vp.Width = (float)m_winW;
-    vp.Height = (float)m_winH;
-    vp.MinDepth = 0.f;
-    vp.MaxDepth = 1.f;
-    m_ctx->RSSetViewports(1, &vp);
+    m_rt.Begin(clear);
 
     UINT stride = 16;
     UINT offset = 0;
@@ -246,5 +164,5 @@ void D3DRenderer::RenderFrame(ID3D11Texture2D* capturedTex)
     ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
     m_ctx->PSSetShaderResources(0, 1, nullSRV);
 
-    m_swap->Present(1, 0);
+    m_rt.Present(1);
 }

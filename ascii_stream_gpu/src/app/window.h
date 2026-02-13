@@ -20,7 +20,6 @@ void SetResizeCallback(HWND hwnd, ResizeCallback cb);
 
 // Getters
 bool AppIsRunning();
-void GetAppWindowSize(int& outW, int& outH);
 WindowRole GetAppWindowRole(HWND hwnd);
 
 

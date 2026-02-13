@@ -7,16 +7,12 @@
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
 
+#include "../dx/DxUtils.h"
+
 using namespace winrt;
 using namespace winrt::Windows::Graphics::Capture;
 using namespace winrt::Windows::Graphics::DirectX;
 using namespace winrt::Windows::Graphics::DirectX::Direct3D11;
-
-static void ThrowIfFailed(HRESULT hr, const char* msg)
-{
-    if (FAILED(hr))
-        throw std::runtime_error(msg);
-}
 
 // Wraps an ID3D11Device as WinRT IDirect3DDevice (required by WGC FramePool).
 static IDirect3DDevice CreateWinRTDirect3DDevice(ComPtr<ID3D11Device> const& d3dDevice)

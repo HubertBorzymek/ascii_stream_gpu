@@ -2,8 +2,6 @@
 #include <atomic>
 
 static std::atomic<bool> s_running{ true };
-static int s_winW;
-static int s_winH;
 
 static ResizeCallback s_onResize = nullptr;
 
