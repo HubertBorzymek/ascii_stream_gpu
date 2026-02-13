@@ -2,6 +2,8 @@
 // Minimal Win32 + D3D11 window that displays Windows Graphics Capture frames (GPU-only path).
 
 #include "Window.h"
+#include "WindowRole.h"
+#include "Hotkeys.h"
 #include "../capture/ScreenCapture.h"
 #include "../render/D3dRenderer.h"
 #include "../dx/DxContext.h"
@@ -49,16 +51,25 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int)
             return 0;
         }
 
-        HWND hwnd = CreateAppWindow(hInst, WIN_W, WIN_H);
+        // Create two windows
+        HWND hwndMain = CreateAppWindow(hInst, WindowRole::Main, WIN_W, WIN_H, 100, 100);
+        HWND hwndPanel = CreateAppWindow(hInst, WindowRole::Panel, 520, WIN_H, 100 + WIN_W + 10, 100); 
+
+		// Register hotkeys (e.g., F1 to toggle panel visibility).
+        Hotkeys::Register(hwndPanel);
+        
+        (void)hwndPanel; // panel unused for now
 
         // Create D3D device/context (GPU).
         DxContext dx = CreateDxContext();
 
-        // Create render system (swapchain + shader pipeline).
+        // Create render system (swapchain + shader pipeline) - MAIN ONLY for now.
         D3DRenderer renderer;
-        renderer.Initialize(hwnd, dx.device, dx.context);
+        renderer.Initialize(hwndMain, dx.device, dx.context);
         g_renderer = &renderer;
-        SetResizeCallback(&OnAppResize);
+
+        // Resize callback bound to MAIN window
+        SetResizeCallback(hwndMain, &OnAppResize);
 
         // Create screen capure (WGC).
         ScreenCapture capture;
@@ -78,6 +89,9 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int)
         {
             while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
             {
+                if (Hotkeys::HandleMessage(msg))
+                    continue;
+
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
             }
@@ -94,7 +108,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int)
             {
                 wchar_t title[128];
                 swprintf_s(title, L"ASCII Stream GPU  |  FPS: %llu", frameCount);
-                SetWindowText(hwnd, title);
+                SetWindowText(hwndMain, title);
                 frameCount = 0;
                 lastTick = now;
             }
@@ -103,10 +117,13 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int)
 
         frameProcessor.Shutdown();
         capture.Stop();
+        Hotkeys::Unregister();
         return 0;
     }
     catch (const std::exception& e)
     {
+        Hotkeys::Unregister();
+
         std::wstring wmsg = L"Fatal error: ";
         wmsg += std::wstring(e.what(), e.what() + strlen(e.what()));
         MessageBox(nullptr, wmsg.c_str(), L"Exception", MB_OK | MB_ICONERROR);

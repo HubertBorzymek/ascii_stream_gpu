@@ -14,6 +14,7 @@
     <CudaCompile Include="src\processing\effects\ASCII\AsciiKernel.cu" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\app\Hotkeys.cpp" />
     <ClCompile Include="src\app\Main.cpp" />
     <ClCompile Include="src\app\Window.cpp" />
     <ClCompile Include="src\capture\ScreenCapture.cpp" />
@@ -24,6 +25,7 @@
     <ClCompile Include="src\render\D3dRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\app\Hotkeys.h" />
     <ClInclude Include="src\app\WindowRole.h" />
     <ClInclude Include="src\processing\core\FrameProcessor.h" />
     <ClInclude Include="src\processing\cuda\CudaUtils.h" />
@@ -36,6 +38,7 @@
     <ClInclude Include="src\capture\ScreenCapture.h" />
     <ClInclude Include="src\dx\DxContext.h" />
     <ClInclude Include="src\render\D3dRenderer.h" />
+    <ClInclude Include="src\render\SwapChainRenderTarget.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9BA688B4-A49B-19A6-F431-EE7F07EA6C7E}</ProjectGuid>
