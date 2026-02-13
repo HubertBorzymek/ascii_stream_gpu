@@ -19,3 +19,4 @@ void SetResizeCallback(ResizeCallback cb);
 bool AppIsRunning();
 void GetAppWindowSize(int& outW, int& outH);
 
+

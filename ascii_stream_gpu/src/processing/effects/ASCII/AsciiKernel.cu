@@ -12,8 +12,8 @@
 #define BLOCK_SIZE   8
 #define TILE_PIXELS  (BLOCK_SIZE * BLOCK_SIZE)
 
-#define EDGE_THRESHOLD  0.25f   // 0..1 of 255
-#define COH_THRESHOLD   0.75f
+#define EDGE_THRESHOLD  0.2f   // 0..1 of 255
+#define COH_THRESHOLD   0.5f
 #define EPS             1e-6f
 #define PI              3.1415926535f
 
@@ -103,7 +103,7 @@ __device__ void shadePixelMonochrome(cudaSurfaceObject_t dstSurf, const int x, c
     //          nice yellow = (0.2, 0.7, 0.9)
     const float b = 0.9f;
     const float g = 0.9f;
-    const float r = 0.7f;
+    const float r = 0.5f;
 
     uchar4 out;
     out.x = static_cast<unsigned char>(base * b); // B
@@ -116,9 +116,7 @@ __device__ void shadePixelMonochrome(cudaSurfaceObject_t dstSurf, const int x, c
 
 // Kernel: read BGRA8 via texture, write BGRA8 via surface.
 // For now: invert colors to verify the pipeline end-to-end.
-__global__ void AsciiKernel(cudaTextureObject_t srcTex, cudaSurfaceObject_t dstSurf,
-    int width,
-    int height)
+__global__ void AsciiKernel(cudaTextureObject_t srcTex, cudaSurfaceObject_t dstSurf, int width, int height)
 {
     // 2D thread coordinates in block (0..BLOCK_SIZE-1)
     int tx = threadIdx.x;

@@ -7,12 +7,14 @@
 #include "../dx/DxContext.h"
 #include "../processing/core/FrameProcessor.h"
 
+#include <stdint.h>
 #include <Windows.h>
 #include <iostream>
 #include <string>
 #include <cstring>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Graphics.Capture.h>
+
 
 #pragma comment(lib, "windowsapp.lib")
 #pragma comment(lib, "d3d11.lib")
@@ -66,6 +68,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int)
         FrameProcessor frameProcessor;
         frameProcessor.Initialize(dx.device, dx.context);
 
+		// FPS counter (debug)
+        uint64_t frameCount = 0;
+        uint64_t lastTick = GetTickCount64();
+
         // Main message + render loop.
         MSG msg{};
         while (AppIsRunning())
@@ -79,7 +85,20 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int)
             auto tex = capture.LatestTexture();
             ID3D11Texture2D* processed = frameProcessor.Process(tex.Get());
             renderer.RenderFrame(processed);
+            //renderer.RenderFrame(tex.Get());
 
+            // FPS counter
+            frameCount++;
+            uint64_t now = GetTickCount64();
+            if (now - lastTick >= 1000)
+            {
+                wchar_t title[128];
+                swprintf_s(title, L"ASCII Stream GPU  |  FPS: %llu", frameCount);
+                SetWindowText(hwnd, title);
+                frameCount = 0;
+                lastTick = now;
+            }
+			// FPS counter end
         }
 
         frameProcessor.Shutdown();
