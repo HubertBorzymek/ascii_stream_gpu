@@ -3,6 +3,9 @@
 
 #include "WindowRole.h"
 
+// Forward declaration to avoid heavy includes in Window.h
+class IWindowMessageHandler;
+
 // Resize callback signature.
 // w, h are the new client area size in pixels.
 using ResizeCallback = void(*)(int w, int h);
@@ -15,8 +18,11 @@ LRESULT CALLBACK AppWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 // x,y are initial top-left position on screen.
 HWND CreateAppWindow(HINSTANCE hInst, WindowRole role, int width, int height, int x, int y);
 
-// Setter
+// Setter: legacy resize callback (kept for now for compatibility)
 void SetResizeCallback(HWND hwnd, ResizeCallback cb);
+
+// Setter: message handler
+void SetWindowMessageHandler(HWND hwnd, IWindowMessageHandler* handler);
 
 // Getters
 bool AppIsRunning();

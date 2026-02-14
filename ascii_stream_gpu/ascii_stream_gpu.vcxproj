@@ -14,16 +14,17 @@
     <CudaCompile Include="src\processing\effects\ASCII\AsciiKernel.cu" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\app\App.cpp" />
     <ClCompile Include="src\app\Hotkeys.cpp" />
     <ClCompile Include="src\app\Main.cpp" />
     <ClCompile Include="src\app\Window.cpp" />
     <ClCompile Include="src\capture\ScreenCapture.cpp" />
     <ClCompile Include="src\dx\DxContext.cpp" />
-    <ClCompile Include="src\imgui\backends\imgui_impl_dx11.cpp" />
-    <ClCompile Include="src\imgui\backends\imgui_impl_win32.cpp" />
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\imgui_demo.cpp" />
     <ClCompile Include="src\imgui\imgui_draw.cpp" />
+    <ClCompile Include="src\imgui\imgui_impl_dx11.cpp" />
+    <ClCompile Include="src\imgui\imgui_impl_win32.cpp" />
     <ClCompile Include="src\imgui\imgui_tables.cpp" />
     <ClCompile Include="src\imgui\imgui_widgets.cpp" />
     <ClCompile Include="src\processing\core\FrameProcessor.cpp" />
@@ -33,13 +34,16 @@
     <ClCompile Include="src\render\SwapChainRenderTarget.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\app\App.h" />
+    <ClInclude Include="src\app\AppState.h" />
     <ClInclude Include="src\app\Hotkeys.h" />
+    <ClInclude Include="src\app\IWindowMessageHandler.h" />
     <ClInclude Include="src\app\WindowRole.h" />
     <ClInclude Include="src\dx\DxUtils.h" />
-    <ClInclude Include="src\imgui\backends\imgui_impl_dx11.h" />
-    <ClInclude Include="src\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="src\imgui\imconfig.h" />
     <ClInclude Include="src\imgui\imgui.h" />
+    <ClInclude Include="src\imgui\imgui_impl_dx11.h" />
+    <ClInclude Include="src\imgui\imgui_impl_win32.h" />
     <ClInclude Include="src\imgui\imgui_internal.h" />
     <ClInclude Include="src\imgui\imstb_rectpack.h" />
     <ClInclude Include="src\imgui\imstb_textedit.h" />

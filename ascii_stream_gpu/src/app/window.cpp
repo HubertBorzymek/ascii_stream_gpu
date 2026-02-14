@@ -1,4 +1,6 @@
 #include "window.h"
+#include "IWindowMessageHandler.h"
+
 #include <atomic>
 
 static std::atomic<bool> s_running{ true };
@@ -9,6 +11,8 @@ struct WindowState
 {
     WindowRole role = WindowRole::Main;
     ResizeCallback onResize = nullptr;
+    IWindowMessageHandler* handler = nullptr;
+
     int winW = 0;
     int winH = 0;
 };
@@ -21,17 +25,27 @@ static WindowState* GetState(HWND hwnd)
 // Main window procedure (message handler).
 LRESULT CALLBACK AppWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    switch (msg)
+    if (msg == WM_NCCREATE)
     {
-    case WM_NCCREATE:
-    {
-        // CreateWindowEx passes lpParam here (we pass WindowState*).
         CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
         WindowState* st = reinterpret_cast<WindowState*>(cs->lpCreateParams);
         SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(st));
         return TRUE;
     }
 
+    // From now on, we can route messages to a handler (if set).
+    if (WindowState* st = GetState(hwnd))
+    {
+        if (st->handler)
+        {
+            LRESULT routedResult = 0;
+            if (st->handler->HandleMessage(hwnd, msg, wParam, lParam, routedResult))
+                return routedResult;
+        }
+    }
+
+    switch (msg)
+    {
     case WM_SIZE:
     {
         WindowState* st = GetState(hwnd);
@@ -138,7 +152,12 @@ void SetResizeCallback(HWND hwnd, ResizeCallback cb)
         st->onResize = cb;
 }
 
-// Getters
+void SetWindowMessageHandler(HWND hwnd, IWindowMessageHandler* handler)
+{
+    WindowState* st = GetState(hwnd);
+    if (st)
+        st->handler = handler;
+}
 
 // Getters
 bool AppIsRunning()
