@@ -9,4 +9,9 @@ struct AppState
 
     // UI-only globals
     bool showImGuiDemo = false;
+
+    // Overlay / display
+    bool overlayEnabled = false;        // borderless fullscreen overlay on selected monitor
+    bool overlayClickThrough = false;   // pass mouse/keyboard to underlying app (WS_EX_TRANSPARENT)
+
 };

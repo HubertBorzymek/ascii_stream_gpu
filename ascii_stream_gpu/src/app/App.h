@@ -63,7 +63,10 @@ private:
     void UpdateFpsTitle();
 
     void RenderCaptureSettings();
+    void RenderOverlaySettings();
     void RenderAsciiSettings();
+
+    void ApplyMainWindowOverlayMode();
 
     void OnMainResize(int w, int h);
     void OnPanelResize(int w, int h);

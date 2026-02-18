@@ -29,6 +29,12 @@ namespace
     static bool g_excludeAppWindows = true;
     static bool g_appliedExcludeAppWindows = true;
 
+    // Overlay
+    static bool g_overlayApplied = false;
+    static RECT g_mainWindowRestoreRect{ 100, 100, 100 + 1280, 100 + 720 };
+    static LONG_PTR g_mainWindowRestoreStyle = 0;
+    static LONG_PTR g_mainWindowRestoreExStyle = 0;
+
     static std::string WideToUtf8(const std::wstring& w)
     {
         if (w.empty())
@@ -334,10 +340,8 @@ void App::RenderPanel()
 
     ImGui::Begin("Control Panel");
 
-    // --- Capture controls ---
     RenderCaptureSettings();
-
-    // --- Effect controls ---
+    RenderOverlaySettings();
     RenderAsciiSettings();
     //ImGui::Checkbox("Show ImGui demo window", &m_state.showImGuiDemo);
 
@@ -471,6 +475,108 @@ void App::RenderAsciiSettings()
 
     clamp01(m_state.ascii.edgeThreshold);
     clamp01(m_state.ascii.coherenceThreshold);
+}
+
+void App::RenderOverlaySettings()
+{
+    ImGui::Separator();
+    ImGui::Text("Overlay");
+
+    bool changed = false;
+    changed |= ImGui::Checkbox("Enable overlay (borderless fullscreen)", &m_state.overlayEnabled);
+    changed |= ImGui::Checkbox("Click-through (pass input to underlying app)", &m_state.overlayClickThrough);
+
+    if (changed)
+    {
+        ApplyMainWindowOverlayMode();
+    }
+}
+
+void App::ApplyMainWindowOverlayMode()
+{
+    if (!m_hwndMain || !IsWindow(m_hwndMain))
+        return;
+
+    // Determine target monitor rect.
+    RECT targetRect{};
+    if (!g_monitors.empty() &&
+        g_selectedMonitorIndex >= 0 &&
+        g_selectedMonitorIndex < (int)g_monitors.size())
+    {
+        targetRect = g_monitors[g_selectedMonitorIndex].rect;
+    }
+    else
+    {
+        // Fallback to the monitor nearest to the main window.
+        HMONITOR hmon = MonitorFromWindow(m_hwndMain, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO mi{};
+        mi.cbSize = sizeof(mi);
+        if (GetMonitorInfo(hmon, &mi))
+            targetRect = mi.rcMonitor;
+        else
+            return;
+    }
+
+    if (m_state.overlayEnabled)
+    {
+        // Save restore info once when entering overlay.
+        if (!g_overlayApplied)
+        {
+            GetWindowRect(m_hwndMain, &g_mainWindowRestoreRect);
+            g_mainWindowRestoreStyle = GetWindowLongPtr(m_hwndMain, GWL_STYLE);
+            g_mainWindowRestoreExStyle = GetWindowLongPtr(m_hwndMain, GWL_EXSTYLE);
+        }
+
+        // Borderless fullscreen: WS_POPUP (no borders/titlebar).
+        LONG_PTR style = GetWindowLongPtr(m_hwndMain, GWL_STYLE);
+        style &= ~(WS_OVERLAPPEDWINDOW);
+        style |= WS_POPUP;
+        SetWindowLongPtr(m_hwndMain, GWL_STYLE, style);
+
+        // Keep existing ex-style for now (click-through comes later).
+        LONG_PTR exStyle = GetWindowLongPtr(m_hwndMain, GWL_EXSTYLE);
+        SetWindowLongPtr(m_hwndMain, GWL_EXSTYLE, exStyle);
+
+        // Apply size/pos, optionally topmost.
+        const int w = targetRect.right - targetRect.left;
+        const int h = targetRect.bottom - targetRect.top;
+
+        SetWindowPos(
+            m_hwndMain,
+            HWND_TOPMOST, // overlay stays on top; can change later
+            targetRect.left,
+            targetRect.top,
+            w,
+            h,
+            SWP_FRAMECHANGED | SWP_SHOWWINDOW
+        );
+
+        g_overlayApplied = true;
+    }
+    else
+    {
+        // Restore windowed mode if we had applied overlay before.
+        if (g_overlayApplied)
+        {
+            SetWindowLongPtr(m_hwndMain, GWL_STYLE, g_mainWindowRestoreStyle);
+            SetWindowLongPtr(m_hwndMain, GWL_EXSTYLE, g_mainWindowRestoreExStyle);
+
+            const int w = g_mainWindowRestoreRect.right - g_mainWindowRestoreRect.left;
+            const int h = g_mainWindowRestoreRect.bottom - g_mainWindowRestoreRect.top;
+
+            SetWindowPos(
+                m_hwndMain,
+                HWND_NOTOPMOST,
+                g_mainWindowRestoreRect.left,
+                g_mainWindowRestoreRect.top,
+                w,
+                h,
+                SWP_FRAMECHANGED | SWP_SHOWWINDOW
+            );
+
+            g_overlayApplied = false;
+        }
+    }
 }
 
 // ------------------------------------------------------------
