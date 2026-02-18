@@ -27,13 +27,11 @@ static IDirect3DDevice CreateWinRTDirect3DDevice(ComPtr<ID3D11Device> const& d3d
     return inspectable.as<IDirect3DDevice>();
 }
 
-// Creates a GraphicsCaptureItem for the primary monitor.
-static GraphicsCaptureItem CreateCaptureItemForPrimaryMonitor()
+// Creates a GraphicsCaptureItem for a specific monitor.
+static GraphicsCaptureItem CreateCaptureItemForMonitor(HMONITOR hmon)
 {
-    POINT pt{ 0, 0 };
-    HMONITOR hmon = MonitorFromPoint(pt, MONITOR_DEFAULTTOPRIMARY);
     if (!hmon)
-        throw std::runtime_error("MonitorFromPoint failed");
+        throw std::runtime_error("CreateCaptureItemForMonitor: monitor is null");
 
     winrt::com_ptr<IGraphicsCaptureItemInterop> interop =
         get_activation_factory<GraphicsCaptureItem, IGraphicsCaptureItemInterop>();
@@ -49,10 +47,20 @@ static GraphicsCaptureItem CreateCaptureItemForPrimaryMonitor()
     return item;
 }
 
+// Creates a GraphicsCaptureItem for the primary monitor.
+static GraphicsCaptureItem CreateCaptureItemForPrimaryMonitor()
+{
+    POINT pt{ 0, 0 };
+    HMONITOR hmon = MonitorFromPoint(pt, MONITOR_DEFAULTTOPRIMARY);
+    if (!hmon)
+        throw std::runtime_error("MonitorFromPoint failed");
+
+    return CreateCaptureItemForMonitor(hmon);
+}
+
 // Converts WinRT IDirect3DSurface to a COM interop interface that can expose
 // the underlying DXGI/D3D11 resource.
-static ComPtr<::Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess>
-AsDxgiAccess(IDirect3DSurface const& surface)
+static ComPtr<::Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess> AsDxgiAccess(IDirect3DSurface const& surface)
 {
     IInspectable* insp = reinterpret_cast<IInspectable*>(winrt::get_abi(surface));
     ComPtr<::Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess> access;
@@ -66,6 +74,43 @@ AsDxgiAccess(IDirect3DSurface const& surface)
         access.Reset();
 
     return access;
+}
+
+static void ExcludeWindowFromCapture(HWND hwnd, bool exclude)
+{
+    if (!hwnd)
+        return;
+
+    // Available on Windows 10 1903+ (WGC era).
+    // When exclude==true, the window will not appear in Windows Graphics Capture.
+    SetWindowDisplayAffinity(hwnd, exclude ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE);
+}
+
+void ScreenCapture::SetExcludedWindows(HWND mainHwnd, HWND panelHwnd)
+{
+    // Remember previous values so we can undo the exclude when turning it off
+    // or when switching which windows are excluded.
+    HWND prevMain = m_excludeMainHwnd;
+    HWND prevPanel = m_excludePanelHwnd;
+
+    // If previous windows were excluded and are changing now, remove the exclude first.
+    // This is critical when new values are nullptr (checkbox OFF).
+    if (prevMain && prevMain != mainHwnd)
+        ExcludeWindowFromCapture(prevMain, false);
+
+    if (prevPanel && prevPanel != panelHwnd)
+        ExcludeWindowFromCapture(prevPanel, false);
+
+    // Store new values
+    m_excludeMainHwnd = mainHwnd;
+    m_excludePanelHwnd = panelHwnd;
+
+    // Apply exclude for the new windows (if any)
+    if (m_excludeMainHwnd)
+        ExcludeWindowFromCapture(m_excludeMainHwnd, true);
+
+    if (m_excludePanelHwnd)
+        ExcludeWindowFromCapture(m_excludePanelHwnd, true);
 }
 
 ScreenCapture::~ScreenCapture()
@@ -100,6 +145,58 @@ void ScreenCapture::Start(ComPtr<ID3D11Device> device)
 
     m_session = m_framePool.CreateCaptureSession(m_item);
 
+    // Apply exclude (if any) before starting capture
+    ExcludeWindowFromCapture(m_excludeMainHwnd, true);
+    ExcludeWindowFromCapture(m_excludePanelHwnd, true);
+
+    // Register callback.
+    m_framePool.FrameArrived([this](Direct3D11CaptureFramePool const& pool, winrt::Windows::Foundation::IInspectable const&)
+        {
+            this->OnFrameArrived(pool);
+        });
+
+    // Start capture.
+    m_session.StartCapture();
+}
+
+void ScreenCapture::Start(ComPtr<ID3D11Device> device, HMONITOR monitor)
+{
+    if (!device)
+        throw std::runtime_error("ScreenCapture::Start(monitor): device is null");
+
+    if (!GraphicsCaptureSession::IsSupported())
+        throw std::runtime_error("Windows Graphics Capture is not supported");
+
+    if (!monitor)
+        throw std::runtime_error("ScreenCapture::Start(monitor): monitor is null");
+
+    // If already running, restart cleanly.
+    if (m_session || m_framePool || m_item)
+        Stop();
+
+    // Create WinRT device (bridge for WGC).
+    m_winrtDevice = CreateWinRTDirect3DDevice(device);
+
+    // Create capture item (selected monitor).
+    m_item = CreateCaptureItemForMonitor(monitor);
+    auto size = m_item.Size();
+    m_width = size.Width;
+    m_height = size.Height;
+
+    // Create frame pool and session.
+    m_framePool = Direct3D11CaptureFramePool::CreateFreeThreaded(
+        m_winrtDevice,
+        DirectXPixelFormat::B8G8R8A8UIntNormalized,
+        2,
+        size
+    );
+
+    m_session = m_framePool.CreateCaptureSession(m_item);
+
+    // Apply exclude (if any) before starting capture
+    ExcludeWindowFromCapture(m_excludeMainHwnd, true);
+    ExcludeWindowFromCapture(m_excludePanelHwnd, true);
+
     // Register callback.
     m_framePool.FrameArrived([this](Direct3D11CaptureFramePool const& pool, winrt::Windows::Foundation::IInspectable const&)
         {
@@ -112,6 +209,9 @@ void ScreenCapture::Start(ComPtr<ID3D11Device> device)
 
 void ScreenCapture::Stop()
 {
+    ExcludeWindowFromCapture(m_excludeMainHwnd, false);
+    ExcludeWindowFromCapture(m_excludePanelHwnd, false);
+
     if (m_session)
     {
         m_session.Close();

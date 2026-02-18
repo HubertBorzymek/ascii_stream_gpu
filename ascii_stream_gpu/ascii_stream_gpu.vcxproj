@@ -17,6 +17,7 @@
     <ClCompile Include="src\app\App.cpp" />
     <ClCompile Include="src\app\Hotkeys.cpp" />
     <ClCompile Include="src\app\Main.cpp" />
+    <ClCompile Include="src\app\monitor\MonitorEnumerator.cpp" />
     <ClCompile Include="src\app\Window.cpp" />
     <ClCompile Include="src\capture\ScreenCapture.cpp" />
     <ClCompile Include="src\dx\DxContext.cpp" />
@@ -39,6 +40,8 @@
     <ClInclude Include="src\appState\AppState.h" />
     <ClInclude Include="src\app\Hotkeys.h" />
     <ClInclude Include="src\app\IWindowMessageHandler.h" />
+    <ClInclude Include="src\app\monitor\MonitorEnumerator.h" />
+    <ClInclude Include="src\app\monitor\MonitorInfo.h" />
     <ClInclude Include="src\app\WindowRole.h" />
     <ClInclude Include="src\dx\DxUtils.h" />
     <ClInclude Include="src\imgui\imconfig.h" />

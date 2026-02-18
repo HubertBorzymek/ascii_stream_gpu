@@ -49,6 +49,7 @@ private:
     void InitPanelSwapchain();
     void InitImGui();
     void InitCapture();
+    void RestartCaptureSelected();
     void InitFrameProcessor();
 
     void ShutdownImGui();
@@ -56,10 +57,12 @@ private:
     void ShutdownFrameProcessor();
     void ShutdownHotkeys();
 
+
     void RenderMain();
     void RenderPanel();
     void UpdateFpsTitle();
 
+    void RenderCaptureSettings();
     void RenderAsciiSettings();
 
     void OnMainResize(int w, int h);

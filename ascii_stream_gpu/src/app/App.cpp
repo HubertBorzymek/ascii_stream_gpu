@@ -8,6 +8,8 @@
 #include "../imgui/imgui_impl_win32.h"
 #include "../imgui/imgui_impl_dx11.h"
 
+#include "monitor/MonitorEnumerator.h"
+
 #include <stdexcept>
 #include <cstring>
 #include <winrt/Windows.Foundation.h>
@@ -16,6 +18,63 @@
 #pragma comment(lib, "windowsapp.lib")
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+namespace
+{
+    // UI state for monitor selection (kept in App.cpp to avoid touching App.h in this step).
+    static std::vector<MonitorInfo> g_monitors;
+    static std::vector<std::string> g_monitorLabelsUtf8;
+    static int g_selectedMonitorIndex = 0;
+    static int g_appliedMonitorIndex = -1;
+    static bool g_excludeAppWindows = true;
+    static bool g_appliedExcludeAppWindows = true;
+
+    static std::string WideToUtf8(const std::wstring& w)
+    {
+        if (w.empty())
+            return {};
+
+        int sizeNeeded = WideCharToMultiByte(
+            CP_UTF8, 0,
+            w.data(), (int)w.size(),
+            nullptr, 0,
+            nullptr, nullptr
+        );
+
+        if (sizeNeeded <= 0)
+            return {};
+
+        std::string out;
+        out.resize(sizeNeeded);
+
+        WideCharToMultiByte(
+            CP_UTF8, 0,
+            w.data(), (int)w.size(),
+            out.data(), sizeNeeded,
+            nullptr, nullptr
+        );
+
+        return out;
+    }
+
+    static void RefreshMonitorList()
+    {
+        g_monitors = MonitorEnumerator::Enumerate();
+        g_monitorLabelsUtf8.clear();
+        g_monitorLabelsUtf8.reserve(g_monitors.size());
+
+        for (const auto& m : g_monitors)
+            g_monitorLabelsUtf8.push_back(WideToUtf8(m.label));
+
+        // Clamp selection
+        if (g_monitors.empty())
+            g_selectedMonitorIndex = 0;
+        else if (g_selectedMonitorIndex < 0)
+            g_selectedMonitorIndex = 0;
+        else if (g_selectedMonitorIndex >= (int)g_monitors.size())
+            g_selectedMonitorIndex = (int)g_monitors.size() - 1;
+    }
+}
 
 // ------------------------------------------------------------
 // Destructor
@@ -36,6 +95,10 @@ void App::Initialize(HINSTANCE hInst)
     EnsureCaptureSupportedOrThrow();
 
     CreateWindows(hInst);
+    
+    RefreshMonitorList();
+    g_appliedMonitorIndex = g_selectedMonitorIndex;
+
     InitHotkeys();
     InitDx();
     InitMainRenderer();
@@ -198,7 +261,26 @@ void App::InitImGui()
 
 void App::InitCapture()
 {
-    m_capture.Start(m_dx.device);
+    RestartCaptureSelected();
+}
+
+void App::RestartCaptureSelected()
+{
+    // Apply exclude option first (affects window attributes).
+    if (g_excludeAppWindows)
+        m_capture.SetExcludedWindows(m_hwndMain, m_hwndPanel);
+    else
+        m_capture.SetExcludedWindows(nullptr, nullptr);
+
+    // Restart capture on selected monitor (fallback to primary if list empty).
+    if (!g_monitors.empty())
+        m_capture.Start(m_dx.device, g_monitors[g_selectedMonitorIndex].handle);
+    else
+        m_capture.Start(m_dx.device);
+
+    // Sync applied state (prevents re-starting every frame).
+    g_appliedMonitorIndex = g_selectedMonitorIndex;
+    g_appliedExcludeAppWindows = g_excludeAppWindows;
 }
 
 void App::InitFrameProcessor()
@@ -252,7 +334,10 @@ void App::RenderPanel()
 
     ImGui::Begin("Control Panel");
 
-    // --- AppState-driven controls ---
+    // --- Capture controls ---
+    RenderCaptureSettings();
+
+    // --- Effect controls ---
     RenderAsciiSettings();
     //ImGui::Checkbox("Show ImGui demo window", &m_state.showImGuiDemo);
 
@@ -281,6 +366,53 @@ void App::UpdateFpsTitle()
         m_frameCount = 0;
         m_lastTickMs = now;
     }
+}
+
+void App::RenderCaptureSettings()
+{
+    ImGui::Separator();
+    ImGui::Text("Capture");
+
+    if (ImGui::Button("Refresh monitors"))
+    {
+        RefreshMonitorList();
+        g_appliedMonitorIndex = g_selectedMonitorIndex; // keep applied in sync after refresh
+    }
+
+    if (g_monitors.empty())
+    {
+        ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "No monitors detected.");
+        return;
+    }
+
+    ImGui::SetNextItemWidth(300.0f);
+
+    // Build array of const char* for ImGui.
+    std::vector<const char*> items;
+    items.reserve(g_monitorLabelsUtf8.size());
+    for (auto& s : g_monitorLabelsUtf8)
+        items.push_back(s.c_str());
+
+    ImGui::Checkbox("Exclude app windows from capture", &g_excludeAppWindows);
+
+    ImGui::Combo("Monitor source", &g_selectedMonitorIndex, items.data(), (int)items.size());
+
+    // Safety clamp
+    if (g_selectedMonitorIndex < 0) g_selectedMonitorIndex = 0;
+    if (g_selectedMonitorIndex >= (int)g_monitors.size()) g_selectedMonitorIndex = (int)g_monitors.size() - 1;
+
+    const bool needRestart =
+        (g_selectedMonitorIndex != g_appliedMonitorIndex) ||
+        (g_excludeAppWindows != g_appliedExcludeAppWindows);
+
+    if (needRestart)
+    {
+        RestartCaptureSelected();
+    }
+
+    // Optional debug info
+    const auto& sel = g_monitors[g_selectedMonitorIndex];
+    ImGui::Text("Selected: %S", sel.label.c_str());
 }
 
 void App::RenderAsciiSettings()
