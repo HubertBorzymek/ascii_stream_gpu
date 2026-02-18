@@ -52,6 +52,52 @@ bool FrameProcessor::IsEffectEnabled() const
     return effect ? effect->IsEnabled() : false;
 }
 
+void FrameProcessor::ApplyAsciiSettings(const AsciiSettings& settings)
+{
+    // First call: always apply
+    const bool firstApply = !m_hasPrevAsciiSettings;
+
+    // Enabled
+    if (firstApply || (settings.enabled != m_prevAsciiSettings.enabled))
+    {
+        SetEffectEnabled(settings.enabled);
+    }
+
+    // Tint (BGR8)
+    const bool tintChanged =
+        firstApply ||
+        (settings.tintB != m_prevAsciiSettings.tintB) ||
+        (settings.tintG != m_prevAsciiSettings.tintG) ||
+        (settings.tintR != m_prevAsciiSettings.tintR);
+
+    if (tintChanged)
+    {
+        // Forward only if the active effect is AsciiEffect.
+        // (Later, when you have multiple effects, this will be routed differently.)
+        if (auto* ascii = dynamic_cast<AsciiEffect*>(effect.get()))
+        {
+            ascii->SetTintBgr(settings.tintB, settings.tintG, settings.tintR);
+        }
+    }
+
+    // Edge params (0..1)
+    const bool edgeParamsChanged =
+        firstApply ||
+        (settings.edgeThreshold != m_prevAsciiSettings.edgeThreshold) ||
+        (settings.coherenceThreshold != m_prevAsciiSettings.coherenceThreshold);
+
+    if (edgeParamsChanged)
+    {
+        if (auto* ascii = dynamic_cast<AsciiEffect*>(effect.get()))
+        {
+            ascii->SetEdgeParams(settings.edgeThreshold, settings.coherenceThreshold);
+        }
+    }
+
+    m_prevAsciiSettings = settings;
+    m_hasPrevAsciiSettings = true;
+}
+
 ID3D11Texture2D* FrameProcessor::Process(ID3D11Texture2D* inputTex)
 {
     if (!initialized || !enabled)

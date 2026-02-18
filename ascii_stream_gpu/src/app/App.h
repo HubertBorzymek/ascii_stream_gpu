@@ -2,7 +2,7 @@
 
 #include "IWindowMessageHandler.h"
 
-#include "AppState.h"
+#include "../appState/AppState.h"
 
 #include <Windows.h>
 #include <stdint.h>
@@ -60,6 +60,8 @@ private:
     void RenderPanel();
     void UpdateFpsTitle();
 
+    void RenderAsciiSettings();
+
     void OnMainResize(int w, int h);
     void OnPanelResize(int w, int h);
 
@@ -82,6 +84,5 @@ private:
 
     // State
     AppState m_state{};
-    bool m_prevAsciiEnabled = true;
     bool m_initialized = false;
 };

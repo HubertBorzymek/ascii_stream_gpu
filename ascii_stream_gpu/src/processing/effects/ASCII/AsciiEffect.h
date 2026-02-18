@@ -4,6 +4,7 @@
 
 #include <d3d11.h>
 #include <wrl.h>
+#include <cstdint>
 
 using Microsoft::WRL::ComPtr;
 
@@ -21,6 +22,12 @@ public:
 
     AsciiEffect(const AsciiEffect&) = delete;
     AsciiEffect& operator=(const AsciiEffect&) = delete;
+
+    // Sets monochrome tint in BGR (0..255). Converted internally to float multipliers (0..1).
+    void SetTintBgr(uint8_t b, uint8_t g, uint8_t r);
+
+    // Edge detection parameters (0..1).
+    void SetEdgeParams(float edgeThreshold, float coherenceThreshold);
 
 protected:
     void OnShutdown() override;
@@ -51,4 +58,13 @@ private:
     cudaGraphicsResource* m_cudaOutputRes = nullptr;
 
     bool m_cudaReady = false;
+
+    // Monochrome tint multipliers (0..1). Stored as BGR to match BGRA8 logic.
+    float m_tintMulB = 0.9f;
+    float m_tintMulG = 0.9f;
+    float m_tintMulR = 0.5f;
+
+    // Edge detection thresholds (0..1).
+    float m_edgeThreshold = 0.2f;
+    float m_coherenceThreshold = 0.5f;
 };

@@ -34,8 +34,9 @@
     <ClCompile Include="src\render\SwapChainRenderTarget.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\appState\AsciiSettings.h" />
     <ClInclude Include="src\app\App.h" />
-    <ClInclude Include="src\app\AppState.h" />
+    <ClInclude Include="src\appState\AppState.h" />
     <ClInclude Include="src\app\Hotkeys.h" />
     <ClInclude Include="src\app\IWindowMessageHandler.h" />
     <ClInclude Include="src\app\WindowRole.h" />

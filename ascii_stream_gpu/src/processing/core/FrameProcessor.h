@@ -4,6 +4,8 @@
 #include <wrl.h>
 #include <memory>
 
+#include "../../appState/AsciiSettings.h"
+
 #include "../effects/IEffect.h"
 
 using Microsoft::WRL::ComPtr;
@@ -33,6 +35,10 @@ public:
     void SetEffectEnabled(bool enabled);
     bool IsEffectEnabled() const;
 
+    // Applies ASCII effect settings. Internally caches last applied settings
+    // and only forwards changes to the effect when needed.
+    void ApplyAsciiSettings(const AsciiSettings& settings);
+
     // Process one frame. Returns a texture to be rendered.
     // If processing is disabled, returns inputTex.
     ID3D11Texture2D* Process(ID3D11Texture2D* inputTex);
@@ -45,4 +51,8 @@ private:
 
     bool enabled = true;
     bool initialized = false;
+
+    // Cached settings for change detection (kept here to keep App clean).
+    AsciiSettings m_prevAsciiSettings{};
+    bool m_hasPrevAsciiSettings = false;
 };

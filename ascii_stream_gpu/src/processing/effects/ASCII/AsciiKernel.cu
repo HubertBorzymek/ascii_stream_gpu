@@ -12,8 +12,6 @@
 #define BLOCK_SIZE   8
 #define TILE_PIXELS  (BLOCK_SIZE * BLOCK_SIZE)
 
-#define EDGE_THRESHOLD  0.2f   // 0..1 of 255
-#define COH_THRESHOLD   0.5f
 #define EPS             1e-6f
 #define PI              3.1415926535f
 
@@ -29,14 +27,14 @@ __device__ float readPixelLuma(const cudaTextureObject_t srcTex, const int x, co
 
 // Decide if tile has an edge and, if so, return edge glyph index (0..3 or your mapping)
 // Returns -1 if tile has no coherent edge
-__device__ int pickEdgeGlyph(float sumMag, float sumGx, float sumGy) {
+__device__ int pickEdgeGlyph(float sumMag, float sumGx, float sumGy, float edgeThreshold, float coherenceThreshold) {
     // Mean magnitude and direction coherence
     float meanMag = sumMag / (float)TILE_PIXELS;
     float vecLen = sqrtf(sumGx * sumGx + sumGy * sumGy);
     float coherence = vecLen / (sumMag + EPS);
 
-    bool hasEdge = (meanMag >= (255.0f * EDGE_THRESHOLD)) &&
-        (coherence >= COH_THRESHOLD);
+    bool hasEdge = (meanMag >= (255.0f * edgeThreshold)) &&
+        (coherence >= coherenceThreshold);
 
     if (!hasEdge) {
         return -1;
@@ -91,7 +89,7 @@ __device__ int pickBrightnessGlyph(const float sumLuma) {
 }
 
 // Monochrome shading helper: applies a colored ASCII pixel
-__device__ void shadePixelMonochrome(cudaSurfaceObject_t dstSurf, const int x, const int y, const unsigned char base)
+__device__ void shadePixelMonochrome(cudaSurfaceObject_t dstSurf, const int x, const int y, const unsigned char base, const float tintB, const float tintG, const float tintR)
 {
     // Monochrome tint (0.0f..1.0f)
     // Example: blue  = (1, 0, 0)
@@ -101,14 +99,10 @@ __device__ void shadePixelMonochrome(cudaSurfaceObject_t dstSurf, const int x, c
     //          nice blue = (0.9, 0.9, 0.7)
     //          nice orange = (0.2, 0.5, 0.9)
     //          nice yellow = (0.2, 0.7, 0.9)
-    const float b = 0.9f;
-    const float g = 0.9f;
-    const float r = 0.5f;
-
     uchar4 out;
-    out.x = static_cast<unsigned char>(base * b); // B
-    out.y = static_cast<unsigned char>(base * g); // G
-    out.z = static_cast<unsigned char>(base * r); // R
+    out.x = static_cast<unsigned char>(base * tintB); // B
+    out.y = static_cast<unsigned char>(base * tintG); // G
+    out.z = static_cast<unsigned char>(base * tintR); // R
     out.w = 255; // A
 
     surf2Dwrite(out, dstSurf, x * sizeof(uchar4), y);
@@ -116,7 +110,7 @@ __device__ void shadePixelMonochrome(cudaSurfaceObject_t dstSurf, const int x, c
 
 // Kernel: read BGRA8 via texture, write BGRA8 via surface.
 // For now: invert colors to verify the pipeline end-to-end.
-__global__ void AsciiKernel(cudaTextureObject_t srcTex, cudaSurfaceObject_t dstSurf, int width, int height)
+__global__ void AsciiKernel(cudaTextureObject_t srcTex, cudaSurfaceObject_t dstSurf, int width, int height, float tintB, float tintG, float tintR, float edgeThreshold, float coherenceThreshold)
 {
     // 2D thread coordinates in block (0..BLOCK_SIZE-1)
     int tx = threadIdx.x;
@@ -225,7 +219,7 @@ __global__ void AsciiKernel(cudaTextureObject_t srcTex, cudaSurfaceObject_t dstS
         float sumGy = s_Gy[0];
 
         // Try to detect an edge glyph from gradients
-        int edgeGlyph = pickEdgeGlyph(sumMag, sumGx, sumGy);
+        int edgeGlyph = pickEdgeGlyph(sumMag, sumGx, sumGy, edgeThreshold, coherenceThreshold);
 
         if (edgeGlyph >= 0) {
             // Edge tile: use ascii_edges[edgeGlyph]
@@ -266,10 +260,10 @@ __global__ void AsciiKernel(cudaTextureObject_t srcTex, cudaSurfaceObject_t dstS
     base = bit ? 255 : 0; // white symbol on black
 
     // Monochrome tinting
-    shadePixelMonochrome(dstSurf, x, y, base);
+    shadePixelMonochrome(dstSurf, x, y, base, tintB, tintG, tintR);
 }
 
-extern "C" void RunAsciiKernel(cudaArray_t srcArray, cudaArray_t dstArray, int width, int height)
+extern "C" void RunAsciiKernel(cudaArray_t srcArray, cudaArray_t dstArray, int width, int height, float tintB, float tintG, float tintR, float edgeThreshold, float coherenceThreshold)
 {
     // RAII for texture object
     struct TexObjGuard
@@ -332,7 +326,7 @@ extern "C" void RunAsciiKernel(cudaArray_t srcArray, cudaArray_t dstArray, int w
     dim3 grid((width + block.x - 1) / block.x,
         (height + block.y - 1) / block.y);
 
-    AsciiKernel <<< grid, block >>> (srcTex.obj, dstSurf.obj, width, height);
+    AsciiKernel <<< grid, block >>> (srcTex.obj, dstSurf.obj, width, height, tintB, tintG, tintR, edgeThreshold, coherenceThreshold);
 
     // Catch async launch errors
     ThrowIfCuda(cudaGetLastError(), "AsciiKernel launch failed");

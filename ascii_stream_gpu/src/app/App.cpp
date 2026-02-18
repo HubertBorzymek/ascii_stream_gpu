@@ -44,9 +44,8 @@ void App::Initialize(HINSTANCE hInst)
     InitCapture();
     InitFrameProcessor();
 
-    // Sync initial UI state -> backend
-    m_frameProcessor.SetEffectEnabled(m_state.asciiEnabled);
-    m_prevAsciiEnabled = m_state.asciiEnabled;
+    // Sync initial UI state -> backend (delegated to FrameProcessor)
+    m_frameProcessor.ApplyAsciiSettings(m_state.ascii);
 
     m_lastTickMs = GetTickCount64();
     m_initialized = true;
@@ -99,12 +98,8 @@ void App::Tick()
 
     PumpMessages();
 
-    // Apply UI state -> backend only when changed
-    if (m_state.asciiEnabled != m_prevAsciiEnabled)
-    {
-        m_frameProcessor.SetEffectEnabled(m_state.asciiEnabled);
-        m_prevAsciiEnabled = m_state.asciiEnabled;
-    }
+    // Apply UI state -> backend (FrameProcessor handles change detection)
+    m_frameProcessor.ApplyAsciiSettings(m_state.ascii);
 
     RenderMain();
     RenderPanel();
@@ -257,11 +252,9 @@ void App::RenderPanel()
 
     ImGui::Begin("Control Panel");
 
-    ImGui::Text("Hello from ImGui!");
-
     // --- AppState-driven controls ---
-    ImGui::Checkbox("Enable ASCII effect", &m_state.asciiEnabled);
-    ImGui::Checkbox("Show ImGui demo window", &m_state.showImGuiDemo);
+    RenderAsciiSettings();
+    //ImGui::Checkbox("Show ImGui demo window", &m_state.showImGuiDemo);
 
     ImGui::End();
 
@@ -288,6 +281,64 @@ void App::UpdateFpsTitle()
         m_frameCount = 0;
         m_lastTickMs = now;
     }
+}
+
+void App::RenderAsciiSettings()
+{
+    // Enable
+    ImGui::Checkbox("Enable ASCII effect", &m_state.ascii.enabled);
+
+    // Colors
+    ImGui::Separator();
+    ImGui::Text("ASCII Color (RGB)");
+
+    float rgb[3] = {
+        m_state.ascii.tintR / 255.0f,
+        m_state.ascii.tintG / 255.0f,
+        m_state.ascii.tintB / 255.0f
+    };
+
+    if (ImGui::ColorEdit3("Tint", rgb))
+    {
+        auto clamp01 = [](float v) {
+            return (v < 0.0f) ? 0.0f : (v > 1.0f) ? 1.0f : v;
+            };
+
+        rgb[0] = clamp01(rgb[0]);
+        rgb[1] = clamp01(rgb[1]);
+        rgb[2] = clamp01(rgb[2]);
+
+        m_state.ascii.tintR = static_cast<uint8_t>(rgb[0] * 255.0f + 0.5f);
+        m_state.ascii.tintG = static_cast<uint8_t>(rgb[1] * 255.0f + 0.5f);
+        m_state.ascii.tintB = static_cast<uint8_t>(rgb[2] * 255.0f + 0.5f);
+    }
+
+    // Edges
+    ImGui::Separator();
+    ImGui::Text("ASCII Edges");
+
+    const float step = 0.05f;
+    const float stepFast = 0.10f;
+
+
+    ImGui::TextUnformatted("Edge threshold (0.2)");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(120.0f);
+    ImGui::InputFloat("##EdgeThr", &m_state.ascii.edgeThreshold, step, stepFast, "%.2f");
+
+    ImGui::TextUnformatted("Coherence threshold (0.5)");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(120.0f);
+    ImGui::InputFloat("##CohThr", &m_state.ascii.coherenceThreshold, step, stepFast, "%.2f");
+
+    // Clamp to [0..1]
+    auto clamp01 = [](float& v) {
+        if (v < 0.0f) v = 0.0f;
+        if (v > 1.0f) v = 1.0f;
+        };
+
+    clamp01(m_state.ascii.edgeThreshold);
+    clamp01(m_state.ascii.coherenceThreshold);
 }
 
 // ------------------------------------------------------------

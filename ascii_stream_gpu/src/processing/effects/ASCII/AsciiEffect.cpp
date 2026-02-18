@@ -8,7 +8,7 @@
 
 #include "../../cuda/CudaUtils.h"
 
-extern "C" void RunAsciiKernel(cudaArray_t srcArray, cudaArray_t dstArray, int width, int height);
+extern "C" void RunAsciiKernel(cudaArray_t srcArray, cudaArray_t dstArray, int width, int height, float tintB, float tintG, float tintR, float edgeThreshold, float coherenceThreshold);
 
 namespace
 {
@@ -37,6 +37,27 @@ namespace
         CudaGraphicsMapGuard(const CudaGraphicsMapGuard&) = delete;
         CudaGraphicsMapGuard& operator=(const CudaGraphicsMapGuard&) = delete;
     };
+}
+
+void AsciiEffect::SetTintBgr(uint8_t b, uint8_t g, uint8_t r)
+{
+    // Convert once (0..255 -> 0..1) and store as multipliers.
+    // These values are constant for the whole frame and are passed to the kernel later.
+    m_tintMulB = static_cast<float>(b) / 255.0f;
+    m_tintMulG = static_cast<float>(g) / 255.0f;
+    m_tintMulR = static_cast<float>(r) / 255.0f;
+}
+
+void AsciiEffect::SetEdgeParams(float edgeThreshold, float coherenceThreshold)
+{
+    auto clamp01 = [](float v) {
+        if (v < 0.0f) return 0.0f;
+        if (v > 1.0f) return 1.0f;
+        return v;
+        };
+
+    m_edgeThreshold = clamp01(edgeThreshold);
+    m_coherenceThreshold = clamp01(coherenceThreshold);
 }
 
 void AsciiEffect::ReleaseCudaResources()
@@ -216,7 +237,7 @@ ID3D11Texture2D* AsciiEffect::ProcessImpl(ID3D11Texture2D* inputTex)
         ThrowIfCuda(cudaGraphicsSubResourceGetMappedArray(&outArray, m_cudaOutputRes, 0, 0),
             "cudaGraphicsSubResourceGetMappedArray(output) failed");
 
-        RunAsciiKernel(inArray, outArray, (int)m_outputDesc.Width, (int)m_outputDesc.Height);
+        RunAsciiKernel(inArray, outArray, (int)m_outputDesc.Width, (int)m_outputDesc.Height, m_tintMulB, m_tintMulG, m_tintMulR, m_edgeThreshold, m_coherenceThreshold);
 
         // Kernel launch error (asynchronous)
         ThrowIfCuda(cudaGetLastError(), "DebugPassthroughKernel launch failed");
