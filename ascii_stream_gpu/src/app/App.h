@@ -1,25 +1,19 @@
 #pragma once
 
-#include "IWindowMessageHandler.h"
-
-#include "../appState/AppState.h"
-
 #include <Windows.h>
 #include <stdint.h>
 
-#include "../dx/DxContext.h"
-#include "../render/D3dRenderer.h"
-#include "../render/SwapChainRenderTarget.h"
-#include "../capture/ScreenCapture.h"
-#include "../processing/core/FrameProcessor.h"
+#include "window/IWindowMessageHandler.h"
+#include "window/OverlayController.h"
+#include "appState/AppState.h"
 
-// App
-// Owns the application lifetime:
-// - creates windows
-// - initializes D3D device/context
-// - initializes renderers, capture, processing, ImGui
-// - runs tick loop
-// - handles Win32 messages via IWindowMessageHandler (Option 2 routing)
+#include "ui/ControlPanel.h"
+#include "dx/DxContext.h"
+#include "render/D3dRenderer.h"
+#include "render/SwapChainRenderTarget.h"
+#include "capture/ScreenCapture.h"
+#include "processing/core/FrameProcessor.h"
+
 class App final : public IWindowMessageHandler
 {
 public:
@@ -36,7 +30,6 @@ public:
     void PumpMessages();
     void Tick();
 
-    // IWindowMessageHandler
     bool HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, LRESULT& outResult) override;
 
 private:
@@ -57,16 +50,11 @@ private:
     void ShutdownFrameProcessor();
     void ShutdownHotkeys();
 
-
     void RenderMain();
     void RenderPanel();
     void UpdateFpsTitle();
 
-    void RenderCaptureSettings();
-    void RenderOverlaySettings();
-    void RenderAsciiSettings();
-
-    void ApplyMainWindowOverlayMode();
+    void ApplyOverlayFromState();
 
     void OnMainResize(int w, int h);
     void OnPanelResize(int w, int h);
@@ -84,6 +72,11 @@ private:
     ScreenCapture m_capture{};
     FrameProcessor m_frameProcessor{};
 
+    // UI + window controllers
+    ControlPanel m_controlPanel{};
+    ControlPanel::Callbacks m_uiCallbacks{};
+    OverlayController m_overlay{};
+
     // Timing / debug
     uint64_t m_frameCount = 0;
     uint64_t m_lastTickMs = 0;
@@ -91,4 +84,7 @@ private:
     // State
     AppState m_state{};
     bool m_initialized = false;
+
+    // Runtime selection (App-owned, not UI-owned)
+    HMONITOR m_selectedMonitor = nullptr;
 };

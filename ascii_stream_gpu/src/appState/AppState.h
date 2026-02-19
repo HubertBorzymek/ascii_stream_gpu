@@ -2,6 +2,7 @@
 
 #include "AsciiSettings.h"
 
+
 struct AppState
 {
     // Per-effect settings

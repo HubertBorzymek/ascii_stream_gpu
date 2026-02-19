@@ -15,10 +15,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\app\App.cpp" />
-    <ClCompile Include="src\app\Hotkeys.cpp" />
+    <ClCompile Include="src\app\hotkeys\Hotkeys.cpp" />
     <ClCompile Include="src\app\Main.cpp" />
-    <ClCompile Include="src\app\monitor\MonitorEnumerator.cpp" />
-    <ClCompile Include="src\app\Window.cpp" />
+    <ClCompile Include="src\app\ui\ControlPanel.cpp" />
+    <ClCompile Include="src\app\window\OverlayController.cpp" />
+    <ClCompile Include="src\monitor\MonitorEnumerator.cpp" />
+    <ClCompile Include="src\app\window\Window.cpp" />
     <ClCompile Include="src\capture\ScreenCapture.cpp" />
     <ClCompile Include="src\dx\DxContext.cpp" />
     <ClCompile Include="src\imgui\imgui.cpp" />
@@ -38,11 +40,13 @@
     <ClInclude Include="src\appState\AsciiSettings.h" />
     <ClInclude Include="src\app\App.h" />
     <ClInclude Include="src\appState\AppState.h" />
-    <ClInclude Include="src\app\Hotkeys.h" />
-    <ClInclude Include="src\app\IWindowMessageHandler.h" />
-    <ClInclude Include="src\app\monitor\MonitorEnumerator.h" />
-    <ClInclude Include="src\app\monitor\MonitorInfo.h" />
-    <ClInclude Include="src\app\WindowRole.h" />
+    <ClInclude Include="src\app\hotkeys\Hotkeys.h" />
+    <ClInclude Include="src\app\ui\ControlPanel.h" />
+    <ClInclude Include="src\app\window\IWindowMessageHandler.h" />
+    <ClInclude Include="src\app\window\OverlayController.h" />
+    <ClInclude Include="src\monitor\MonitorEnumerator.h" />
+    <ClInclude Include="src\monitor\MonitorInfo.h" />
+    <ClInclude Include="src\app\window\WindowRole.h" />
     <ClInclude Include="src\dx\DxUtils.h" />
     <ClInclude Include="src\imgui\imconfig.h" />
     <ClInclude Include="src\imgui\imgui.h" />
@@ -59,7 +63,7 @@
     <ClInclude Include="src\processing\effects\IEffect.h" />
     <ClInclude Include="src\processing\res\AsciiEdges.h" />
     <ClInclude Include="src\processing\res\AsciiScale.h" />
-    <ClInclude Include="src\app\Window.h" />
+    <ClInclude Include="src\app\window\Window.h" />
     <ClInclude Include="src\capture\ScreenCapture.h" />
     <ClInclude Include="src\dx\DxContext.h" />
     <ClInclude Include="src\render\D3dRenderer.h" />
@@ -107,6 +111,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

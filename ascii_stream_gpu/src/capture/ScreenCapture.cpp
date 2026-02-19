@@ -7,7 +7,7 @@
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
 
-#include "../dx/DxUtils.h"
+#include "dx/DxUtils.h"
 
 using namespace winrt;
 using namespace winrt::Windows::Graphics::Capture;

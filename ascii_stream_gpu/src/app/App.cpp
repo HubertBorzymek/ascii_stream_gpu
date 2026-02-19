@@ -1,14 +1,12 @@
 #include "App.h"
 
-#include "Window.h"
-#include "WindowRole.h"
-#include "Hotkeys.h"
+#include "window/Window.h"
+#include "window/WindowRole.h"
+#include "hotkeys/Hotkeys.h"
 
-#include "../imgui/imgui.h"
-#include "../imgui/imgui_impl_win32.h"
-#include "../imgui/imgui_impl_dx11.h"
-
-#include "monitor/MonitorEnumerator.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_win32.h"
+#include "imgui/imgui_impl_dx11.h"
 
 #include <stdexcept>
 #include <cstring>
@@ -18,69 +16,6 @@
 #pragma comment(lib, "windowsapp.lib")
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-namespace
-{
-    // UI state for monitor selection (kept in App.cpp to avoid touching App.h in this step).
-    static std::vector<MonitorInfo> g_monitors;
-    static std::vector<std::string> g_monitorLabelsUtf8;
-    static int g_selectedMonitorIndex = 0;
-    static int g_appliedMonitorIndex = -1;
-    static bool g_excludeAppWindows = true;
-    static bool g_appliedExcludeAppWindows = true;
-
-    // Overlay
-    static bool g_overlayApplied = false;
-    static RECT g_mainWindowRestoreRect{ 100, 100, 100 + 1280, 100 + 720 };
-    static LONG_PTR g_mainWindowRestoreStyle = 0;
-    static LONG_PTR g_mainWindowRestoreExStyle = 0;
-
-    static std::string WideToUtf8(const std::wstring& w)
-    {
-        if (w.empty())
-            return {};
-
-        int sizeNeeded = WideCharToMultiByte(
-            CP_UTF8, 0,
-            w.data(), (int)w.size(),
-            nullptr, 0,
-            nullptr, nullptr
-        );
-
-        if (sizeNeeded <= 0)
-            return {};
-
-        std::string out;
-        out.resize(sizeNeeded);
-
-        WideCharToMultiByte(
-            CP_UTF8, 0,
-            w.data(), (int)w.size(),
-            out.data(), sizeNeeded,
-            nullptr, nullptr
-        );
-
-        return out;
-    }
-
-    static void RefreshMonitorList()
-    {
-        g_monitors = MonitorEnumerator::Enumerate();
-        g_monitorLabelsUtf8.clear();
-        g_monitorLabelsUtf8.reserve(g_monitors.size());
-
-        for (const auto& m : g_monitors)
-            g_monitorLabelsUtf8.push_back(WideToUtf8(m.label));
-
-        // Clamp selection
-        if (g_monitors.empty())
-            g_selectedMonitorIndex = 0;
-        else if (g_selectedMonitorIndex < 0)
-            g_selectedMonitorIndex = 0;
-        else if (g_selectedMonitorIndex >= (int)g_monitors.size())
-            g_selectedMonitorIndex = (int)g_monitors.size() - 1;
-    }
-}
 
 // ------------------------------------------------------------
 // Destructor
@@ -99,11 +34,34 @@ void App::Initialize(HINSTANCE hInst)
     winrt::init_apartment();
 
     EnsureCaptureSupportedOrThrow();
-
-    CreateWindows(hInst);
     
-    RefreshMonitorList();
-    g_appliedMonitorIndex = g_selectedMonitorIndex;
+    CreateWindows(hInst);
+
+    m_overlay.SetTargetWindow(m_hwndMain);
+
+    m_uiCallbacks.onExcludeWindowsChanged = [this](bool exclude)
+    {
+        if (exclude)
+            m_capture.SetExcludedWindows(m_hwndMain, m_hwndPanel);
+        else
+            m_capture.SetExcludedWindows(nullptr, nullptr);
+
+        // Deterministic behavior: restart capture after changing exclude
+        RestartCaptureSelected();
+    };
+
+    m_uiCallbacks.onMonitorChanged = [this](HMONITOR mon)
+    {
+        m_selectedMonitor = mon;
+
+        RestartCaptureSelected();
+        ApplyOverlayFromState(); // overlay follows selected monitor (optional but logical)
+    };
+
+    m_uiCallbacks.onOverlaySettingsChanged = [this]()
+    {
+        ApplyOverlayFromState();
+    };
 
     InitHotkeys();
     InitDx();
@@ -232,6 +190,18 @@ void App::CreateWindows(HINSTANCE hInst)
     SetWindowMessageHandler(m_hwndPanel, this);
 }
 
+void App::RestartCaptureSelected()
+{
+    // Stop current capture session cleanly
+    m_capture.Stop();
+
+    // Restart capture with selected monitor if available, otherwise fallback to primary
+    if (m_selectedMonitor)
+        m_capture.Start(m_dx.device, m_selectedMonitor);
+    else
+        m_capture.Start(m_dx.device);
+}
+
 // ------------------------------------------------------------
 // Initialization helpers
 // ------------------------------------------------------------
@@ -267,26 +237,8 @@ void App::InitImGui()
 
 void App::InitCapture()
 {
-    RestartCaptureSelected();
-}
-
-void App::RestartCaptureSelected()
-{
-    // Apply exclude option first (affects window attributes).
-    if (g_excludeAppWindows)
-        m_capture.SetExcludedWindows(m_hwndMain, m_hwndPanel);
-    else
-        m_capture.SetExcludedWindows(nullptr, nullptr);
-
-    // Restart capture on selected monitor (fallback to primary if list empty).
-    if (!g_monitors.empty())
-        m_capture.Start(m_dx.device, g_monitors[g_selectedMonitorIndex].handle);
-    else
-        m_capture.Start(m_dx.device);
-
-    // Sync applied state (prevents re-starting every frame).
-    g_appliedMonitorIndex = g_selectedMonitorIndex;
-    g_appliedExcludeAppWindows = g_excludeAppWindows;
+    m_capture.SetExcludedWindows(m_hwndMain, m_hwndPanel);
+    m_capture.Start(m_dx.device);
 }
 
 void App::InitFrameProcessor()
@@ -338,14 +290,8 @@ void App::RenderPanel()
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::Begin("Control Panel");
-
-    RenderCaptureSettings();
-    RenderOverlaySettings();
-    RenderAsciiSettings();
-    //ImGui::Checkbox("Show ImGui demo window", &m_state.showImGuiDemo);
-
-    ImGui::End();
+    // UI renders itself; App only provides state + callbacks (wiring configured elsewhere)
+    m_controlPanel.Render(m_state, m_uiCallbacks);
 
     if (m_state.showImGuiDemo)
         ImGui::ShowDemoWindow(&m_state.showImGuiDemo);
@@ -372,211 +318,14 @@ void App::UpdateFpsTitle()
     }
 }
 
-void App::RenderCaptureSettings()
+void App::ApplyOverlayFromState()
 {
-    ImGui::Separator();
-    ImGui::Text("Capture");
+    OverlayController::Settings s{};
+    s.enabled = m_state.overlayEnabled;
+    s.clickThrough = m_state.overlayClickThrough;
+    s.topMost = true; // na razie sta³e
 
-    if (ImGui::Button("Refresh monitors"))
-    {
-        RefreshMonitorList();
-        g_appliedMonitorIndex = g_selectedMonitorIndex; // keep applied in sync after refresh
-    }
-
-    if (g_monitors.empty())
-    {
-        ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "No monitors detected.");
-        return;
-    }
-
-    ImGui::SetNextItemWidth(300.0f);
-
-    // Build array of const char* for ImGui.
-    std::vector<const char*> items;
-    items.reserve(g_monitorLabelsUtf8.size());
-    for (auto& s : g_monitorLabelsUtf8)
-        items.push_back(s.c_str());
-
-    ImGui::Checkbox("Exclude app windows from capture", &g_excludeAppWindows);
-
-    ImGui::Combo("Monitor source", &g_selectedMonitorIndex, items.data(), (int)items.size());
-
-    // Safety clamp
-    if (g_selectedMonitorIndex < 0) g_selectedMonitorIndex = 0;
-    if (g_selectedMonitorIndex >= (int)g_monitors.size()) g_selectedMonitorIndex = (int)g_monitors.size() - 1;
-
-    const bool needRestart =
-        (g_selectedMonitorIndex != g_appliedMonitorIndex) ||
-        (g_excludeAppWindows != g_appliedExcludeAppWindows);
-
-    if (needRestart)
-    {
-        RestartCaptureSelected();
-    }
-
-    // Optional debug info
-    const auto& sel = g_monitors[g_selectedMonitorIndex];
-    ImGui::Text("Selected: %S", sel.label.c_str());
-}
-
-void App::RenderAsciiSettings()
-{
-    // Enable
-    ImGui::Checkbox("Enable ASCII effect", &m_state.ascii.enabled);
-
-    // Colors
-    ImGui::Separator();
-    ImGui::Text("ASCII Color (RGB)");
-
-    float rgb[3] = {
-        m_state.ascii.tintR / 255.0f,
-        m_state.ascii.tintG / 255.0f,
-        m_state.ascii.tintB / 255.0f
-    };
-
-    if (ImGui::ColorEdit3("Tint", rgb))
-    {
-        auto clamp01 = [](float v) {
-            return (v < 0.0f) ? 0.0f : (v > 1.0f) ? 1.0f : v;
-            };
-
-        rgb[0] = clamp01(rgb[0]);
-        rgb[1] = clamp01(rgb[1]);
-        rgb[2] = clamp01(rgb[2]);
-
-        m_state.ascii.tintR = static_cast<uint8_t>(rgb[0] * 255.0f + 0.5f);
-        m_state.ascii.tintG = static_cast<uint8_t>(rgb[1] * 255.0f + 0.5f);
-        m_state.ascii.tintB = static_cast<uint8_t>(rgb[2] * 255.0f + 0.5f);
-    }
-
-    // Edges
-    ImGui::Separator();
-    ImGui::Text("ASCII Edges");
-
-    const float step = 0.05f;
-    const float stepFast = 0.10f;
-
-
-    ImGui::TextUnformatted("Edge threshold (0.2)");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(120.0f);
-    ImGui::InputFloat("##EdgeThr", &m_state.ascii.edgeThreshold, step, stepFast, "%.2f");
-
-    ImGui::TextUnformatted("Coherence threshold (0.5)");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(120.0f);
-    ImGui::InputFloat("##CohThr", &m_state.ascii.coherenceThreshold, step, stepFast, "%.2f");
-
-    // Clamp to [0..1]
-    auto clamp01 = [](float& v) {
-        if (v < 0.0f) v = 0.0f;
-        if (v > 1.0f) v = 1.0f;
-        };
-
-    clamp01(m_state.ascii.edgeThreshold);
-    clamp01(m_state.ascii.coherenceThreshold);
-}
-
-void App::RenderOverlaySettings()
-{
-    ImGui::Separator();
-    ImGui::Text("Overlay");
-
-    bool changed = false;
-    changed |= ImGui::Checkbox("Enable overlay (borderless fullscreen)", &m_state.overlayEnabled);
-    changed |= ImGui::Checkbox("Click-through (pass input to underlying app)", &m_state.overlayClickThrough);
-
-    if (changed)
-    {
-        ApplyMainWindowOverlayMode();
-    }
-}
-
-void App::ApplyMainWindowOverlayMode()
-{
-    if (!m_hwndMain || !IsWindow(m_hwndMain))
-        return;
-
-    // Determine target monitor rect.
-    RECT targetRect{};
-    if (!g_monitors.empty() &&
-        g_selectedMonitorIndex >= 0 &&
-        g_selectedMonitorIndex < (int)g_monitors.size())
-    {
-        targetRect = g_monitors[g_selectedMonitorIndex].rect;
-    }
-    else
-    {
-        // Fallback to the monitor nearest to the main window.
-        HMONITOR hmon = MonitorFromWindow(m_hwndMain, MONITOR_DEFAULTTONEAREST);
-        MONITORINFO mi{};
-        mi.cbSize = sizeof(mi);
-        if (GetMonitorInfo(hmon, &mi))
-            targetRect = mi.rcMonitor;
-        else
-            return;
-    }
-
-    if (m_state.overlayEnabled)
-    {
-        // Save restore info once when entering overlay.
-        if (!g_overlayApplied)
-        {
-            GetWindowRect(m_hwndMain, &g_mainWindowRestoreRect);
-            g_mainWindowRestoreStyle = GetWindowLongPtr(m_hwndMain, GWL_STYLE);
-            g_mainWindowRestoreExStyle = GetWindowLongPtr(m_hwndMain, GWL_EXSTYLE);
-        }
-
-        // Borderless fullscreen: WS_POPUP (no borders/titlebar).
-        LONG_PTR style = GetWindowLongPtr(m_hwndMain, GWL_STYLE);
-        style &= ~(WS_OVERLAPPEDWINDOW);
-        style |= WS_POPUP;
-        SetWindowLongPtr(m_hwndMain, GWL_STYLE, style);
-
-        // Keep existing ex-style for now (click-through comes later).
-        LONG_PTR exStyle = GetWindowLongPtr(m_hwndMain, GWL_EXSTYLE);
-        SetWindowLongPtr(m_hwndMain, GWL_EXSTYLE, exStyle);
-
-        // Apply size/pos, optionally topmost.
-        const int w = targetRect.right - targetRect.left;
-        const int h = targetRect.bottom - targetRect.top;
-
-        SetWindowPos(
-            m_hwndMain,
-            HWND_TOPMOST, // overlay stays on top; can change later
-            targetRect.left,
-            targetRect.top,
-            w,
-            h,
-            SWP_FRAMECHANGED | SWP_SHOWWINDOW
-        );
-
-        g_overlayApplied = true;
-    }
-    else
-    {
-        // Restore windowed mode if we had applied overlay before.
-        if (g_overlayApplied)
-        {
-            SetWindowLongPtr(m_hwndMain, GWL_STYLE, g_mainWindowRestoreStyle);
-            SetWindowLongPtr(m_hwndMain, GWL_EXSTYLE, g_mainWindowRestoreExStyle);
-
-            const int w = g_mainWindowRestoreRect.right - g_mainWindowRestoreRect.left;
-            const int h = g_mainWindowRestoreRect.bottom - g_mainWindowRestoreRect.top;
-
-            SetWindowPos(
-                m_hwndMain,
-                HWND_NOTOPMOST,
-                g_mainWindowRestoreRect.left,
-                g_mainWindowRestoreRect.top,
-                w,
-                h,
-                SWP_FRAMECHANGED | SWP_SHOWWINDOW
-            );
-
-            g_overlayApplied = false;
-        }
-    }
+    m_overlay.Apply(s, m_selectedMonitor);
 }
 
 // ------------------------------------------------------------
