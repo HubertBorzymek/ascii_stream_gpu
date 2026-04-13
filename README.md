@@ -8,7 +8,7 @@ The application captures the screen, processes frames using CUDA, and renders th
 
 <p align="center">
   <a href="https://youtu.be/Q_bNDp0qSZ8" target="_blank">
-    <img src="docs/ascii_maroko.png" alt="Demo video thumbnail" width="600">
+    <img src="docs/ascii_maroko.png" alt="Demo video thumbnail" width="300">
   </a>
 </p>
 
