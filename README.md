@@ -6,8 +6,30 @@ The application captures the screen, processes frames using CUDA, and renders th
 
 ## Demo
 
-[![Demo 1](docs/ascii_maroko.png)](https://youtu.be/Q_bNDp0qSZ8)
-[![Demo 2](docs/ascii_elden.png)](https://youtu.be/lvUeFYmFA1M)
+<p align="center">
+  <a href="https://youtu.be/Q_bNDp0qSZ8" target="_blank">
+    <img src="docs/ascii_maroko.png" alt="Demo video thumbnail" width="600">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/Q_bNDp0qSZ8" target="_blank">
+    Watch demo video
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/lvUeFYmFA1M" target="_blank">
+    <img src="docs/ascii_elden.png" alt="Demo video thumbnail" width="600">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/lvUeFYmFA1M" target="_blank">
+    Watch demo video
+  </a>
+</p>
+
 
 ## Overview
 
